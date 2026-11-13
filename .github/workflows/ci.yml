@@ -38,6 +38,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build # includes the production build of the frontend once it exists
+        timeout-minutes: 10 # a hanging build should fail in minutes, not after the 25 minute job limit
       - run: npm run csp:check # the inline theme script hash in infra/ must match the build
       - run: npm run synth
 
