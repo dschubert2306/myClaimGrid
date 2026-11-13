@@ -21,9 +21,13 @@ export class LanguageService {
   }
 
   set(lang: Lang): void {
-    this.lang.set(lang);
     storageSet('local', STORAGE_KEYS.language, lang);
     this.apply(lang);
+    // The texts of a language load on first use. Publish the new language only once they are there,
+    // otherwise anything that translates when `lang` changes (labels, errors) would show keys.
+    void firstValueFrom(this.transloco.load(lang))
+      .catch(() => undefined)
+      .then(() => this.lang.set(lang));
   }
 
   private apply(lang: Lang): void {

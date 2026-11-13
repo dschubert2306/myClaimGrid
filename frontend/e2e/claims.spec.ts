@@ -290,9 +290,9 @@ test.describe('calendar', () => {
     const calendar = dialog.getByRole('dialog', { name: 'Datum auswählen' });
     await expect(calendar).toBeVisible();
 
-    await calendar.getByLabel('Monat').selectOption({ label: 'März' });
-    await calendar.getByLabel('Jahr').selectOption('2026');
-    await calendar.getByRole('gridcell', { name: /12\. März 2026/ }).click();
+    await calendar.getByLabel('Monat', { exact: true }).selectOption({ label: 'März' });
+    await calendar.getByLabel('Jahr', { exact: true }).selectOption('2026');
+    await calendar.locator('[data-iso="2026-03-12"]').click();
 
     await expect(calendar).toBeHidden();
     await expect(dialog.getByLabel('Datum', { exact: true })).toHaveValue('12.03.2026');
@@ -309,9 +309,9 @@ test.describe('calendar', () => {
     await expect(selected).toBeFocused();
 
     await page.keyboard.press('PageDown'); // 31 Jan -> 28 Feb
-    await expect(dialog.getByRole('gridcell', { name: /28\. Februar 2026/ })).toBeFocused();
+    await expect(dialog.locator('[data-iso="2026-02-28"]')).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(dialog.getByRole('gridcell', { name: /1\. März 2026/ })).toBeFocused();
+    await expect(dialog.locator('[data-iso="2026-03-01"]')).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(field).toHaveValue('01.03.2026');
   });

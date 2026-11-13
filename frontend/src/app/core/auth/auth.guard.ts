@@ -8,7 +8,9 @@ import { rememberReturnTo } from './return-to';
 export const authGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  if ((await auth.init()) && auth.isAuthenticated()) return true;
+  // init() resolves once with the state at page load. After a sign-in in the page, isAuthenticated() is current.
+  await auth.init();
+  if (auth.isAuthenticated()) return true;
   rememberReturnTo(state.url);
   return router.createUrlTree([LOGIN_PATH]);
 };
