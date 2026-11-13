@@ -46,7 +46,8 @@ export class AuthStack extends cdk.Stack {
     this.userPoolClient = this.userPool.addClient('SpaClient', {
       userPoolClientName: 'myclaimgrid-spa',
       generateSecret: false, // public client, protected by PKCE
-      authFlows: {}, // no direct password flows, only the hosted UI with the authorization code flow
+      // The login page signs in directly: USER_PASSWORD_AUTH (over TLS, no SRP) and the refresh token.
+      authFlows: { userPassword: true },
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],

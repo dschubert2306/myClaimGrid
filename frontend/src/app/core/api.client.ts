@@ -17,7 +17,7 @@ import { ConfigService } from './config.service';
 
 export type UploadEvent = { kind: 'progress'; percent: number } | { kind: 'done' };
 
-/** Typed access to the myClaimGrid API. The bearer token is added by the OIDC interceptor. */
+/** Typed access to the myClaimGrid API. The bearer token is added by the auth interceptor. */
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -73,7 +73,7 @@ export class ApiClient {
 
   /**
    * Sends the PDF straight to S3 with the presigned POST. The file must be the last form field.
-   * The OIDC interceptor only adds the token to the API, so no Authorization header reaches S3.
+   * The auth interceptor only adds the token to the API, so no Authorization header reaches S3.
    */
   uploadToS3(upload: CreateUploadResponse['upload'], file: File): Observable<UploadEvent> {
     const form = new FormData();

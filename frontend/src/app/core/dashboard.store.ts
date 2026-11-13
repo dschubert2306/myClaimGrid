@@ -61,8 +61,12 @@ export class DashboardStore {
     }
   }
 
-  async rename(personId: string, name: string): Promise<void> {
-    const person = await firstValueFrom(this.api.renamePerson(personId, { name }));
+  /** Name and Selbstbehalt of one person. The color is not editable. */
+  async savePerson(
+    personId: string,
+    changes: { name: string; deductible?: number },
+  ): Promise<void> {
+    const person = await firstValueFrom(this.api.renamePerson(personId, changes));
     this.persons.update((list) => list.map((p) => (p.personId === personId ? person : p)));
     this.dashboard.update((d) =>
       d
@@ -74,5 +78,16 @@ export class DashboardStore {
           }
         : d,
     );
+  }
+
+  rename(personId: string, name: string): Promise<void> {
+    return this.savePerson(personId, { name });
+  }
+
+  /** Persons for the settings: the loaded ones, or a fresh read (this also seeds the three persons). */
+  async ensurePersons(): Promise<void> {
+    if (this.persons().length > 0) return;
+    const { persons } = await firstValueFrom(this.api.persons());
+    this.persons.set(persons);
   }
 }

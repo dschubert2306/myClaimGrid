@@ -23,7 +23,7 @@ infra/               CDK app. Stacks: frontend, storage, auth, api, frontend-dep
 infra/bootstrap/     CloudFormation template for the GitHub OIDC role (applied once by you)
 backend/             Lambda handlers, repository, extraction, tests
 shared/              zod schemas of the API contract (used by backend and frontend)
-frontend/            Angular app (standalone components, signals, Transloco, Cognito login)
+frontend/            Angular app (standalone components, signals, Transloco, Cognito login on the landing page)
 design-system/       The binding myClaimGrid design system
 ```
 
@@ -51,7 +51,7 @@ npm run test:e2e      # Playwright against the "e2e" build (first run: npx playw
 
 Backend, frontend and infra import the API contract from `shared`, which is built first. The root scripts do that in the right order.
 
-**Frontend against a deployed backend:** after the first deployment copy [frontend/config.example.json](frontend/config.example.json) to `frontend/public/config.json` (git-ignored), fill in the stack outputs (API URL, user pool ID, client ID, hosted UI URL), then `npm run start -w frontend`. The sign-in redirects to `http://localhost:4200/auth/callback`, which the Cognito client allows by default.
+**Frontend against a deployed backend:** after the first deployment copy [frontend/config.example.json](frontend/config.example.json) to `frontend/public/config.json` (git-ignored), fill in the stack outputs (API URL, region, user pool ID, client ID), then `npm run start -w frontend`. The login page signs in directly against the Cognito API, there is no redirect.
 
 **Frontend without a backend:** `npm run start:e2e -w frontend` serves the app with a fake sign-in. The Playwright tests answer every API call themselves ([frontend/e2e/support.ts](frontend/e2e/support.ts)).
 
@@ -106,7 +106,7 @@ Nothing below is run automatically. Use a dev or prod account of your choice.
 - **API:** HTTP API with a Cognito JWT authorizer on every route. Four Lambdas (persons, claims, dashboard, extraction) with separate least-privilege roles. Logs are kept for 30 days.
 - **Data:** one DynamoDB table (`pk`, `sk`) plus the index `byClaimId`. Persons live under `USER#<sub>`, claims under `PERSON#<id>`. Drafts use the sort key `CLAIM#DRAFT#<id>` and move to `CLAIM#<invoiceDate>#<id>` when saved. Amounts are integer cents.
 - **Upload:** `POST /uploads` creates a draft and returns a presigned POST (PDF only, 10 MB, enforced by S3). The S3 event on `uploads/*.pdf` triggers the extraction Lambda, which calls Textract `AnalyzeExpense`, maps five fields, and writes the result to the draft. The frontend polls `GET /claims/{id}`.
-- **Frontend:** Angular 22 (standalone components, signals, no zone.js), styles generated from `design-system/` (`npm run tokens`), texts in `de.json` and `en.json` (Transloco, switched at runtime), dates, numbers and currency formatted for `de-DE` or `en-GB`. `/login` and `/auth/callback` sit outside the signed-in shell. Runtime settings come from `/config.json`, written by the CDK app at deploy time.
+- **Frontend:** Angular 22 (standalone components, signals, no zone.js), styles generated from `design-system/` (`npm run tokens`), texts in `de.json` and `en.json` (Transloco, switched at runtime), dates, numbers and currency formatted for `de-DE` or `en-GB`. `/login` sits outside the signed-in shell. Runtime settings come from `/config.json`, written by the CDK app at deploy time.
 - **Extractor:** behind the `InvoiceExtractor` interface in [backend/src/extraction/extractor.ts](backend/src/extraction/extractor.ts), so Textract can be replaced (for example by a model on Bedrock) without touching anything else.
 
 ## Assumptions and decisions
@@ -126,10 +126,15 @@ These came up while building. Change them if you disagree.
 - **Deleted invoices:** versioning stays on, deleting an invoice adds a delete marker and noncurrent versions expire after 30 days.
 - **Abandoned drafts** (browser closed during the dialog) keep their draft item and file. A cleanup job is a later task.
 - **API throttling** is 10 requests per second, burst 20.
-- **Sign-in routes:** the Cognito client redirects to `/auth/callback` after sign-in and to `/login` after sign-out (the LoginPage flow of the design system), for CloudFront and for localhost. The login page itself has no password field, everything happens on the Cognito pages.
-- **Sign-in with Cognito is not tested against a real user pool.** The OIDC settings are explicit (hosted UI authorize, token, logout and revoke endpoints, `client_id` and `logout_uri` on sign-out, `ignoreNonceAfterRefresh` for Cognito's refresh tokens) and unit tested, the flow is tested with a fake. Check sign-in, silent renewal and sign-out once after the first deployment.
-- **Tokens:** the API gets the access token (Cognito puts the app client in `client_id`, the HTTP API JWT authorizer accepts that). The token is only sent to the API URL, never to S3.
-- **Amounts and dates in the form** are typed in the format of the active language (`1.234,56` and `12.03.2026`, or `1,234.56` and `12/03/2026`). Ambiguous input such as `12.5` in German is rejected, not guessed.
+- **Sign-in on the landing page:** `/login` has the email and password form and talks to the Cognito API itself (`InitiateAuth` with `USER_PASSWORD_AUTH`, `RespondToAuthChallenge`, `ForgotPassword`, `ConfirmForgotPassword`, `RevokeToken`, code in [frontend/src/app/core/auth/cognito-core.ts](frontend/src/app/core/auth/cognito-core.ts)). The app client allows exactly `USER_PASSWORD_AUTH` and the refresh token flow. The password goes to Cognito over TLS and is not stored. SRP (password never sent) is not implemented. Steps on the page: sign in, new password (first sign-in of a user created with `admin-create-user`), authenticator code (users who already have TOTP), forgot password (code by mail). Cognito's error texts are never shown.
+- **Not tested against a real user pool.** The flow is unit tested against a fake `fetch` and in the browser against a fake auth service. Check sign-in, the new-password step, token renewal and sign-out once after the first deployment.
+- **No TOTP enrolment in the app.** The user pool allows TOTP (optional), but enabling it needs the hosted UI or the CLI. The code step only serves users who are already enrolled. Say if you want an enrolment screen in the settings.
+- **The hosted UI is still deployed** (domain, OAuth code flow, callback URLs) but nothing in the app uses it. Removing it from [infra/lib/auth-stack.ts](infra/lib/auth-stack.ts) is a later cleanup.
+- **Tokens:** the API gets the access token (Cognito puts the app client in `client_id`, the HTTP API JWT authorizer accepts that). The token is only sent to the API URL, never to S3. Access and refresh token are kept in `sessionStorage` (gone when the tab closes), renewed one minute before they expire, and the refresh token is revoked on sign-out.
+- **Amounts in the form** are typed in the format of the active language (`1.234,56` or `1,234.56`). Ambiguous input such as `12.5` in German is rejected, not guessed.
+- **Dates** are typed or picked in the date format of the settings (`dd.MM.yyyy`, `dd/MM/yyyy`, `MM/dd/yyyy`, `yyyy-MM-dd`; default follows the language). ISO `2026-03-12` is always accepted. The calendar next to the field starts the week on Monday and opens on the typed date.
+- **Settings** (`/settings`): names and Selbstbehalt of the three persons are saved to the account (`PUT /persons/{id}`, `deductible` in integer cents, 0 = none). Date and time format are kept in this browser like language and theme. The Selbstbehalt is yearly and the same for every year. The person card compares it with the total of all saved claims of the selected year (open claims count). There is no year-specific amount.
+- **Time format:** stored and previewed in the settings, but the app shows no times yet, so it has no visible effect.
 - **Cancel and Escape** delete the draft and its PDF after an upload. If the browser is closed instead, the draft stays (see above).
 - **Localhost callback:** the Cognito client also allows `http://localhost:4200/` for `ng serve`. Remove it with `-c localCallback=false`.
 - **Budget:** monthly cost budget with a default limit of 10 USD (`-c budgetLimitUsd=...`), mails at 80 percent actual and 100 percent forecast. It is only created when `ALERT_EMAIL` is set, and the deploy job refuses to run without it.
@@ -146,12 +151,11 @@ The design system is binding. These are the places where the app had to go beyon
 - **Invoice date label** is "Datum" / "Date" in the dialog (as in the Dialog preview), "Rechnungsdatum" does not fit next to the "Aus PDF" tag in the 40% column.
 - **Theme switch** shows icons and labels on desktop and icons only below 640px, following the README text. The TopBar preview shows icons only.
 - **Type styles** (`title-1`, `figure`, and so on) exist as `.mcg-type-<name>` classes generated from `tokens.json`, because `bundle.css` has none.
-- The Cognito sign-in pages are not styled by the app, see "Open points".
+- **Top bar** has a Settings button between the theme switch and Sign out (the design system lists year, language, theme, sign out only). The settings page, the calendar popover and the Selbstbehalt bar are built from existing tokens and classes, they have no design-system preview yet.
 
 ## Open points
 
 - Check the Textract quality on two or three real invoices before relying on it (German doctor invoices are often multi-page and itemized). If it is not good enough, replace the extractor.
-- Style the Cognito managed login pages in the Cognito branding editor after the first deployment (accent button, `bg` and `surface` grounds, IBM Plex Sans, square corners). It is a manual step, not part of the CDK app.
 - Retention rules for stored invoices (current versions).
 - Git hosting: the pipeline assumes GitHub.
 - The status workflow after release 1 (submitted, reimbursed, rejected).

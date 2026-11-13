@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  computed,
   effect,
   inject,
   input,
@@ -15,11 +16,18 @@ import { DashboardStore } from '../core/dashboard.store';
 import { McgCurrencyPipe } from '../core/pipes';
 import { ButtonComponent } from './button.component';
 import { ClaimTableComponent } from './claim-table.component';
+import { ProgressComponent } from './progress.component';
 
 /** One dashboard column: name, total and count for the year, and the claims. */
 @Component({
   selector: 'section[mcg-person-card]',
-  imports: [TranslocoPipe, McgCurrencyPipe, ButtonComponent, ClaimTableComponent],
+  imports: [
+    TranslocoPipe,
+    McgCurrencyPipe,
+    ButtonComponent,
+    ClaimTableComponent,
+    ProgressComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'mcg-person', '[style.--person]': "'var(--' + person().color + ')'" },
   template: `
@@ -62,6 +70,24 @@ import { ClaimTableComponent } from './claim-table.component';
         <div class="mcg-person__count">{{ count() }}</div>
       </div>
     </div>
+    @if (person().deductible > 0) {
+      <div class="app-deductible">
+        <mcg-progress
+          [label]="
+            reached()
+              ? ('person.deductibleReached'
+                | transloco: { amount: (person().deductible | mcgCurrency) })
+              : ('person.deductibleOpen'
+                | transloco
+                  : {
+                      remaining: (person().deductible - total() | mcgCurrency),
+                      amount: (person().deductible | mcgCurrency),
+                    })
+          "
+          [percent]="deductiblePercent()"
+        />
+      </div>
+    }
     @if (claims().length > 0) {
       <mcg-claim-table
         [claims]="claims()"
@@ -88,6 +114,14 @@ export class PersonCardComponent {
   readonly claims = input.required<Claim[]>();
   readonly selectedId = input<string | null>(null);
   readonly openClaim = output<string>();
+
+  protected readonly deductiblePercent = computed(() => {
+    const deductible = this.person().deductible;
+    return deductible > 0 ? Math.min(100, Math.floor((this.total() / deductible) * 100)) : 0;
+  });
+  protected readonly reached = computed(
+    () => this.person().deductible > 0 && this.total() >= this.person().deductible,
+  );
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');

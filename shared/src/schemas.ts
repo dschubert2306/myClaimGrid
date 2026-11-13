@@ -38,18 +38,24 @@ export const yearSchema = z.coerce.number().int().min(1900).max(2200);
 /** Integer cents, greater than zero. */
 export const amountCentsSchema = z.number().int().positive().max(100_000_000_00);
 
+/** Selbstbehalt (yearly deductible) in integer cents. Zero means none. */
+export const deductibleCentsSchema = z.number().int().min(0).max(100_000_00);
+
 // ---------------------------------------------------------------- persons
 
 export const personSchema = z.strictObject({
   personId: idSchema,
   name: z.string(),
   color: personColorSchema,
+  /** Yearly Selbstbehalt in cents, 0 when not set. */
+  deductible: deductibleCentsSchema,
 });
 export type Person = z.infer<typeof personSchema>;
 
 export const renamePersonRequestSchema = z.strictObject({
   name: z.string().trim().min(1).max(60),
   color: personColorSchema.optional(),
+  deductible: deductibleCentsSchema.optional(),
 });
 export type RenamePersonRequest = z.infer<typeof renamePersonRequestSchema>;
 

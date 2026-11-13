@@ -18,6 +18,7 @@ export interface PersonItem {
   personId: string;
   name: string;
   color: PersonColor;
+  deductible?: number; // integer cents, absent on items written before the setting existed
   createdAt: string;
 }
 
@@ -46,7 +47,12 @@ export interface ClaimItem {
 }
 
 export function toPerson(item: PersonItem): Person {
-  return { personId: item.personId, name: item.name, color: item.color };
+  return {
+    personId: item.personId,
+    name: item.name,
+    color: item.color,
+    deductible: item.deductible ?? 0,
+  };
 }
 
 export function toClaim(item: ClaimItem): Claim {

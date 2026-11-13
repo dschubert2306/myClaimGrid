@@ -5,7 +5,7 @@ import {
   type ExtractableField,
 } from '@myclaimgrid/shared';
 import { formatAmountPlain, formatInvoiceDate } from './format';
-import type { AppLocale } from './locale';
+import type { Formats } from './date-format';
 import { parseAmountInput, parseDateInput } from './parse-input';
 
 /**
@@ -43,7 +43,7 @@ export const EMPTY_CLAIM_FORM: ClaimFormValues = {
 export function validateField(
   name: ClaimFieldName,
   rawValue: string | null | undefined,
-  locale: AppLocale,
+  formats: Formats,
 ): FieldErrorKey | null {
   const value = (rawValue ?? '').trim();
   if (value.length > MAX_LENGTH[name]) return 'maxLength';
@@ -52,10 +52,10 @@ export function validateField(
       return value === '' ? 'required' : null;
     case 'invoiceDate':
       if (value === '') return 'required';
-      return parseDateInput(value, locale) === null ? 'date' : null;
+      return parseDateInput(value, formats.dateFormat) === null ? 'date' : null;
     case 'amount':
       if (value === '') return 'required';
-      return parseAmountInput(value, locale) === null ? 'amount' : null;
+      return parseAmountInput(value, formats.locale) === null ? 'amount' : null;
     default:
       return null;
   }
@@ -66,10 +66,10 @@ export type ClaimFormResult =
   | { ok: false; errors: Partial<Record<ClaimFieldName, FieldErrorKey>> };
 
 /** Validates the form and converts it to the API shape. */
-export function toClaimFields(values: ClaimFormValues, locale: AppLocale): ClaimFormResult {
+export function toClaimFields(values: ClaimFormValues, formats: Formats): ClaimFormResult {
   const errors: Partial<Record<ClaimFieldName, FieldErrorKey>> = {};
   for (const name of CLAIM_FIELD_NAMES) {
-    const error = validateField(name, values[name], locale);
+    const error = validateField(name, values[name], formats);
     if (error) errors[name] = error;
   }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
@@ -77,8 +77,8 @@ export function toClaimFields(values: ClaimFormValues, locale: AppLocale): Claim
   const candidate = {
     provider: values.provider.trim(),
     invoiceNumber: values.invoiceNumber.trim(),
-    invoiceDate: parseDateInput(values.invoiceDate, locale),
-    amount: parseAmountInput(values.amount, locale),
+    invoiceDate: parseDateInput(values.invoiceDate, formats.dateFormat),
+    amount: parseAmountInput(values.amount, formats.locale),
     description: values.description.trim(),
   };
   // Final guard with the same schema the API uses.
@@ -88,12 +88,12 @@ export function toClaimFields(values: ClaimFormValues, locale: AppLocale): Claim
 }
 
 /** Claim from the API -> text shown in the form. Missing values stay empty, nothing is guessed. */
-export function fromClaim(claim: Claim, locale: AppLocale): ClaimFormValues {
+export function fromClaim(claim: Claim, formats: Formats): ClaimFormValues {
   return {
     provider: claim.provider ?? '',
     invoiceNumber: claim.invoiceNumber ?? '',
-    invoiceDate: claim.invoiceDate ? formatInvoiceDate(claim.invoiceDate, locale) : '',
-    amount: claim.amount !== null ? formatAmountPlain(claim.amount, locale) : '',
+    invoiceDate: claim.invoiceDate ? formatInvoiceDate(claim.invoiceDate, formats.dateFormat) : '',
+    amount: claim.amount !== null ? formatAmountPlain(claim.amount, formats.locale) : '',
     description: claim.description ?? '',
   };
 }

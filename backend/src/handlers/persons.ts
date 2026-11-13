@@ -15,7 +15,12 @@ export const handler = createHandler({
     const body = parseBody(req, renamePersonRequestSchema);
     const person = await getPerson(req.sub, personId);
     if (!person) throw new HttpError(404, 'not_found');
-    const next = { ...person, name: body.name, color: body.color ?? person.color };
+    const next = {
+      ...person,
+      name: body.name,
+      color: body.color ?? person.color,
+      deductible: body.deductible ?? person.deductible ?? 0,
+    };
     await savePerson(next);
     return ok(toPerson(next));
   },

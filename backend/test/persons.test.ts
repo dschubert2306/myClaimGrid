@@ -40,6 +40,24 @@ describe('persons', () => {
     expect(json(result)).toMatchObject({ name: 'Anna', color: 'person-1' });
   });
 
+  it('stores the Selbstbehalt in cents and keeps it when only the name changes', async () => {
+    const { persons } = json(await handler(apiEvent('GET /persons')));
+    expect(persons[0].deductible).toBe(0);
+    const put = (body: unknown) =>
+      handler(apiEvent('PUT /persons/{id}', { pathParameters: { id: persons[0].personId }, body }));
+    expect(json(await put({ name: 'Anna', deductible: 50000 }))).toMatchObject({
+      deductible: 50000,
+    });
+    expect(json(await put({ name: 'Anna B.' }))).toMatchObject({
+      name: 'Anna B.',
+      deductible: 50000,
+    });
+    expect(json(await put({ name: 'Anna B.', deductible: 0 }))).toMatchObject({ deductible: 0 });
+    for (const bad of [-1, 1.5, 'x', 100_000_01]) {
+      expect(await put({ name: 'Anna', deductible: bad })).toMatchObject({ statusCode: 400 });
+    }
+  });
+
   it('returns 404 for a person of another user and 400 for an empty name', async () => {
     const { persons } = json(await handler(apiEvent('GET /persons', { sub: 'other' })));
     const foreign = await handler(

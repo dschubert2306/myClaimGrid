@@ -271,3 +271,77 @@ test.describe('dashboard and claims', () => {
     await expect(page.getByRole('row', { name: /Altpraxis/ })).toBeVisible();
   });
 });
+
+test.describe('calendar', () => {
+  test.beforeEach(async ({ page }) => {
+    await signedIn(page);
+    api = await mockBackend(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Neue Rechnung' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
+    await dialog.locator('label', { hasText: 'Manuell erfassen' }).click();
+    await dialog.getByLabel('Person').selectOption({ label: 'Anna' });
+    await dialog.getByRole('button', { name: 'Weiter' }).click();
+  });
+
+  test('picks a date from the calendar and writes it in the date format', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
+    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    const calendar = dialog.getByRole('dialog', { name: 'Datum auswählen' });
+    await expect(calendar).toBeVisible();
+
+    await calendar.getByLabel('Monat').selectOption({ label: 'März' });
+    await calendar.getByLabel('Jahr').selectOption('2026');
+    await calendar.getByRole('gridcell', { name: /12\. März 2026/ }).click();
+
+    await expect(calendar).toBeHidden();
+    await expect(dialog.getByLabel('Datum', { exact: true })).toHaveValue('12.03.2026');
+    await expect(dialog.getByLabel('Datum', { exact: true })).toBeFocused();
+  });
+
+  test('opens on the typed date, selects it, and moves by keyboard', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
+    const field = dialog.getByLabel('Datum', { exact: true });
+    await field.fill('31.01.2026');
+    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    const selected = dialog.getByRole('gridcell', { selected: true });
+    await expect(selected).toHaveAccessibleName(/31\. Januar 2026/);
+    await expect(selected).toBeFocused();
+
+    await page.keyboard.press('PageDown'); // 31 Jan -> 28 Feb
+    await expect(dialog.getByRole('gridcell', { name: /28\. Februar 2026/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(dialog.getByRole('gridcell', { name: /1\. März 2026/ })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(field).toHaveValue('01.03.2026');
+  });
+
+  test('Escape closes only the calendar, an outside click closes it too', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
+    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await page.keyboard.press('Escape');
+    await expect(dialog.getByRole('dialog', { name: 'Datum auswählen' })).toBeHidden();
+    await expect(dialog).toBeVisible(); // the claim dialog stays
+
+    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await dialog.getByLabel('Rechnungsnummer').click();
+    await expect(dialog.getByRole('dialog', { name: 'Datum auswählen' })).toBeHidden();
+  });
+
+  test('"Heute" fills today and a typed date still works and is validated', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
+    const field = dialog.getByLabel('Datum', { exact: true });
+    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await dialog.getByRole('button', { name: 'Heute' }).click();
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    await expect(field).toHaveValue(
+      `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`,
+    );
+
+    await field.fill('31.02.2026');
+    await field.blur();
+    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await expect(dialog.getByText('Bitte gib ein gültiges Datum ein.')).toBeVisible();
+  });
+});

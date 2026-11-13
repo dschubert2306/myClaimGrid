@@ -124,3 +124,183 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Date input with calendar (ui/date-input.component.ts) */
+.mcg-date {
+  position: relative;
+  display: block;
+}
+.mcg-input--date {
+  padding-right: var(--control-md);
+}
+.mcg-date__toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.mcg-date__toggle:hover:not(:disabled) {
+  color: var(--ink);
+}
+.mcg-date__toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mcg-date__toggle svg,
+.mcg-date__nav svg {
+  width: 18px;
+  height: 18px;
+}
+.mcg-date__pop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  width: 304px;
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border-hairline) solid var(--line-strong);
+  box-shadow: var(--shadow-overlay);
+}
+.mcg-date__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+.mcg-date__head .mcg-select {
+  flex: 1;
+  min-width: 0;
+}
+.mcg-date__head .mcg-select select {
+  width: 100%;
+  padding-left: var(--space-2);
+}
+.mcg-date__nav {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border: var(--border-hairline) solid transparent;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.mcg-date__nav:hover {
+  background: var(--surface-sunken);
+}
+.mcg-date__row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.mcg-date__weekday {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.mcg-date__day {
+  height: 36px;
+  border: var(--border-hairline) solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.mcg-date__day:hover {
+  background: var(--surface-sunken);
+}
+.mcg-date__day--outside {
+  color: var(--ink-muted);
+}
+.mcg-date__day--today {
+  border-color: var(--line-strong);
+  font-weight: 600;
+}
+.mcg-date__day[aria-selected='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.mcg-date__foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+.mcg-date__link {
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.mcg-date__link:hover {
+  text-decoration: underline;
+}
+
+/* Selbstbehalt progress under the totals of a person card */
+.app-deductible {
+  padding: var(--space-3) var(--space-6);
+  border-bottom: var(--border-hairline) solid var(--line);
+}
+
+/* Settings */
+.app-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 720px;
+  padding: var(--space-6);
+  background: var(--surface);
+  border: var(--border-hairline) solid var(--line);
+}
+.app-card__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.app-card__text {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+.app-card__preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+}
+.app-person-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-4);
+  padding-left: var(--space-3);
+  border-left: var(--border-bar) solid var(--person, var(--person-1));
+}
+@media (max-width: 639.98px) {
+  .app-person-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -31,8 +31,10 @@ import {
 import { DashboardStore } from '../../core/dashboard.store';
 import { formatAmountPlain, formatInvoiceDate } from '../../core/format';
 import { LanguageService } from '../../core/language.service';
+import { PreferencesService } from '../../core/preferences.service';
 import { parseAmountInput, parseDateInput } from '../../core/parse-input';
 import { ButtonComponent } from '../../ui/button.component';
+import { DateInputComponent } from '../../ui/date-input.component';
 import { DropzoneComponent } from '../../ui/dropzone.component';
 import { FieldComponent } from '../../ui/field.component';
 import { IconComponent } from '../../ui/icon.component';
@@ -61,6 +63,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
     ReactiveFormsModule,
     TranslocoPipe,
     ButtonComponent,
+    DateInputComponent,
     DropzoneComponent,
     FieldComponent,
     IconComponent,
@@ -78,6 +81,7 @@ export class ClaimDialogComponent implements OnDestroy {
   private readonly api = inject(ApiClient);
   private readonly store = inject(DashboardStore);
   private readonly language = inject(LanguageService);
+  private readonly preferences = inject(PreferencesService);
   private readonly i18n = inject(TranslocoService);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly destroyRef = inject(DestroyRef);
@@ -116,7 +120,7 @@ export class ClaimDialogComponent implements OnDestroy {
           nonNullable: true,
           validators: [
             (control): ValidationErrors | null => {
-              const key = validateField(name, control.value, this.language.locale());
+              const key = validateField(name, control.value, this.preferences.formats());
               return key ? { [key]: true } : null;
             },
           ],
@@ -245,7 +249,7 @@ export class ClaimDialogComponent implements OnDestroy {
     this.claim.set(claim);
     this.setPdf(claim.pdfUrl);
     this.extractionFailed.set(failed);
-    this.fill(failed ? EMPTY_CLAIM_FORM : fromClaim(claim, this.language.locale()));
+    this.fill(failed ? EMPTY_CLAIM_FORM : fromClaim(claim, this.preferences.formats()));
     const markers = failed ? { extracted: [], missing: [] } : fieldMarkers(claim);
     this.extractedFields.set(markers.extracted);
     this.missingFields.set(markers.missing);
@@ -270,7 +274,7 @@ export class ClaimDialogComponent implements OnDestroy {
       this.claim.set(claim);
       this.personId.set(claim.personId);
       this.setPdf(claim.pdfUrl);
-      this.fill(fromClaim(claim, this.language.locale()));
+      this.fill(fromClaim(claim, this.preferences.formats()));
       this.focusFirst();
     } catch {
       this.error.set('errors.loadClaimFailed');
@@ -304,13 +308,13 @@ export class ClaimDialogComponent implements OnDestroy {
   /** Shows what was typed in the format of the language once the field is left. */
   protected normalize(name: 'invoiceDate' | 'amount'): void {
     const control = this.form.controls[name];
-    const locale = this.language.locale();
+    const { locale, dateFormat } = this.preferences.formats();
     if (name === 'amount') {
       const cents = parseAmountInput(control.value, locale);
       if (cents !== null) control.setValue(formatAmountPlain(cents, locale), { emitEvent: false });
     } else {
-      const iso = parseDateInput(control.value, locale);
-      if (iso !== null) control.setValue(formatInvoiceDate(iso, locale), { emitEvent: false });
+      const iso = parseDateInput(control.value, dateFormat);
+      if (iso !== null) control.setValue(formatInvoiceDate(iso, dateFormat), { emitEvent: false });
     }
   }
 
@@ -318,7 +322,7 @@ export class ClaimDialogComponent implements OnDestroy {
     if (this.saving()) return;
     this.formSubmitted.set(true);
     this.form.markAllAsTouched();
-    const result = toClaimFields(this.form.getRawValue(), this.language.locale());
+    const result = toClaimFields(this.form.getRawValue(), this.preferences.formats());
     if (!result.ok) {
       const first = CLAIM_FIELD_NAMES.find((name) => result.errors[name]);
       if (first) this.host.nativeElement.querySelector<HTMLElement>(`#f-${first}`)?.focus();

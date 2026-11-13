@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAmountInput, parseDateInput } from './parse-input';
+import { parseAmountInput, parseDateInput, parseDeductibleInput } from './parse-input';
 
 describe('parseAmountInput', () => {
   it.each([
@@ -40,27 +40,51 @@ describe('parseAmountInput', () => {
 
 describe('parseDateInput', () => {
   it.each([
-    ['12.03.2026', 'de-DE', '2026-03-12'],
-    ['1.3.2026', 'de-DE', '2026-03-01'],
-    ['12.03.26', 'de-DE', '2026-03-12'],
-    ['12/03/2026', 'en-GB', '2026-03-12'],
-    ['2026-03-12', 'de-DE', '2026-03-12'],
-    ['2026-03-12', 'en-GB', '2026-03-12'],
-    ['29.02.2024', 'de-DE', '2024-02-29'],
-  ] as const)('reads %s (%s) as %s', (input, locale, iso) => {
-    expect(parseDateInput(input, locale)).toBe(iso);
+    ['12.03.2026', 'dd.MM.yyyy', '2026-03-12'],
+    ['1.3.2026', 'dd.MM.yyyy', '2026-03-01'],
+    ['12.03.26', 'dd.MM.yyyy', '2026-03-12'],
+    ['12/03/2026', 'dd/MM/yyyy', '2026-03-12'],
+    ['03/12/2026', 'MM/dd/yyyy', '2026-03-12'],
+    ['2026-03-12', 'yyyy-MM-dd', '2026-03-12'],
+    ['2026-03-12', 'dd.MM.yyyy', '2026-03-12'], // ISO is always accepted
+    ['29.02.2024', 'dd.MM.yyyy', '2024-02-29'],
+  ] as const)('reads %s (%s) as %s', (input, format, iso) => {
+    expect(parseDateInput(input, format)).toBe(iso);
   });
 
   it.each([
-    ['', 'de-DE'],
-    ['31.02.2026', 'de-DE'],
-    ['29.02.2026', 'de-DE'],
-    ['12.13.2026', 'de-DE'],
-    ['12/03/2026', 'de-DE'], // the other language's separator
-    ['12.03.2026', 'en-GB'],
-    ['12.03.1800', 'de-DE'],
-    ['hallo', 'de-DE'],
-  ] as const)('rejects %j (%s)', (input, locale) => {
-    expect(parseDateInput(input, locale)).toBeNull();
+    ['', 'dd.MM.yyyy'],
+    ['31.02.2026', 'dd.MM.yyyy'],
+    ['29.02.2026', 'dd.MM.yyyy'],
+    ['12.13.2026', 'dd.MM.yyyy'],
+    ['13/12/2026', 'MM/dd/yyyy'], // month 13
+    ['12/03/2026', 'dd.MM.yyyy'], // the other separator
+    ['12.03.2026', 'dd/MM/yyyy'],
+    ['12.03.1800', 'dd.MM.yyyy'],
+    ['12.03.202', 'dd.MM.yyyy'], // three digit year
+    ['hallo', 'dd.MM.yyyy'],
+  ] as const)('rejects %j (%s)', (input, format) => {
+    expect(parseDateInput(input, format)).toBeNull();
+  });
+});
+
+describe('parseDeductibleInput', () => {
+  it('reads an empty field and zero as no Selbstbehalt', () => {
+    for (const input of ['', ' ', '0', '0,00', '0 €']) {
+      expect(parseDeductibleInput(input, 'de-DE')).toBe(0);
+    }
+    expect(parseDeductibleInput('0.00', 'en-GB')).toBe(0);
+  });
+
+  it('reads amounts like the claim form does', () => {
+    expect(parseDeductibleInput('500', 'de-DE')).toBe(50000);
+    expect(parseDeductibleInput('1.250,50 €', 'de-DE')).toBe(125050);
+    expect(parseDeductibleInput('1,250.50', 'en-GB')).toBe(125050);
+  });
+
+  it('rejects nonsense, negative values and more than the API allows', () => {
+    for (const input of ['abc', '-5', '12.5', '100.001', '1.000.000']) {
+      expect(parseDeductibleInput(input, 'de-DE')).toBeNull();
+    }
   });
 });

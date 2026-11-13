@@ -264,16 +264,12 @@
         [tag]="tagFor('invoiceDate')"
         [error]="errorText('invoiceDate')"
       >
-        <input
-          id="f-invoiceDate"
-          class="mcg-input mcg-num"
+        <mcg-date-input
+          inputId="f-invoiceDate"
           formControlName="invoiceDate"
-          autocomplete="off"
-          inputmode="numeric"
-          [placeholder]="'form.datePlaceholder' | transloco"
-          [attr.aria-invalid]="errorText('invoiceDate') ? true : null"
-          [attr.aria-describedby]="describedBy('invoiceDate')"
-          (blur)="normalize('invoiceDate')"
+          [invalid]="!!errorText('invoiceDate')"
+          [describedBy]="describedBy('invoiceDate')"
+          (blurred)="normalize('invoiceDate')"
         />
       </mcg-field>
       <mcg-field

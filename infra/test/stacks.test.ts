@@ -87,7 +87,7 @@ describe('StorageStack', () => {
 describe('AuthStack', () => {
   const template = stack('auth');
 
-  it('disables self sign-up and uses a public PKCE client without direct auth flows', () => {
+  it('disables self sign-up and uses a public client that allows the password sign-in of the login page', () => {
     template.hasResourceProperties('AWS::Cognito::UserPool', {
       AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
       MfaConfiguration: 'OPTIONAL',
@@ -97,6 +97,8 @@ describe('AuthStack', () => {
       GenerateSecret: false,
       AllowedOAuthFlows: ['code'],
       AllowedOAuthFlowsUserPoolClient: true,
+      // USER_PASSWORD_AUTH for the login page, the refresh token flow is always on. No SRP, no admin flows.
+      ExplicitAuthFlows: ['ALLOW_USER_PASSWORD_AUTH', 'ALLOW_REFRESH_TOKEN_AUTH'],
     });
   });
 

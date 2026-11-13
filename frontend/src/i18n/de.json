@@ -3,20 +3,65 @@
     "year": "Jahr",
     "language": "Sprache",
     "theme": "Darstellung",
-    "signOut": "Abmelden"
+    "signOut": "Abmelden",
+    "settings": "Einstellungen"
   },
-  "theme": { "light": "Hell", "system": "System", "dark": "Dunkel" },
+  "theme": {
+    "light": "Hell",
+    "system": "System",
+    "dark": "Dunkel"
+  },
   "login": {
     "title": "Rechnungen im Blick",
     "text": "Arzt- und Klinikrechnungen für alle drei Personen erfassen und pro Jahr auswerten.",
+    "email": "E-Mail",
+    "password": "Passwort",
     "signIn": "Anmelden",
-    "redirecting": "Weiterleitung …",
-    "meta": "Die Anmeldung läuft über eine gesicherte Seite von AWS. Danach geht es automatisch zurück.",
+    "signingIn": "Anmeldung läuft …",
+    "forgot": "Passwort vergessen?",
+    "continue": "Weiter",
+    "backToSignIn": "Zurück zur Anmeldung",
+    "emailInvalid": "Bitte gib eine gültige E-Mail-Adresse ein.",
+    "mismatch": "Die Passwörter stimmen nicht überein.",
+    "code": "Code",
+    "newPassword": {
+      "title": "Neues Passwort festlegen",
+      "text": "Dein Konto wurde mit einem vorläufigen Passwort angelegt. Lege ein eigenes fest, um fortzufahren.",
+      "label": "Neues Passwort",
+      "repeat": "Neues Passwort wiederholen",
+      "hint": "Mindestens 12 Zeichen, mit Groß- und Kleinbuchstaben und einer Ziffer."
+    },
+    "mfa": {
+      "title": "Code eingeben",
+      "text": "Gib den 6-stelligen Code aus deiner Authenticator-App ein.",
+      "verify": "Bestätigen"
+    },
+    "forgotStep": {
+      "title": "Passwort zurücksetzen",
+      "text": "Gib deine E-Mail-Adresse ein. Wenn es ein Konto gibt, schicken wir dir einen Code.",
+      "send": "Code senden"
+    },
+    "reset": {
+      "title": "Neues Passwort festlegen",
+      "text": "Falls es ein Konto für {{email}} gibt, ist ein Code unterwegs. Gib ihn zusammen mit deinem neuen Passwort ein.",
+      "submit": "Passwort festlegen"
+    },
     "invitationOnly": "Zugang nur auf Einladung.",
     "signedOut": "Du wurdest abgemeldet.",
-    "error": "Die Anmeldung hat nicht geklappt. Bitte versuche es erneut."
+    "sessionExpired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    "passwordChanged": "Dein Passwort wurde geändert. Bitte melde dich an.",
+    "errors": {
+      "invalid_credentials": "E-Mail oder Passwort stimmt nicht.",
+      "invalid_code": "Der Code stimmt nicht. Bitte versuche es erneut.",
+      "expired_code": "Der Code ist abgelaufen. Bitte fordere einen neuen an.",
+      "password_policy": "Dieses Passwort wird nicht akzeptiert. Verwende mindestens 12 Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer.",
+      "password_reset_required": "Bitte setze dein Passwort zurück, um fortzufahren.",
+      "rate_limited": "Zu viele Versuche. Bitte warte einen Moment und versuche es erneut.",
+      "session_expired": "Die Anmeldung hat zu lange gedauert. Bitte beginne von vorn.",
+      "network": "Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung und versuche es erneut.",
+      "unknown": "Die Anmeldung hat nicht geklappt. Bitte versuche es erneut."
+    }
   },
-  "callback": { "completing": "Anmeldung wird abgeschlossen" },
   "dashboard": {
     "title": "Rechnungen {{year}}",
     "newClaim": "Neue Rechnung",
@@ -36,7 +81,9 @@
     "save": "Speichern",
     "cancel": "Abbrechen",
     "noClaims": "Für {{year}} noch keine Rechnungen.",
-    "renameError": "Der Name konnte nicht gespeichert werden."
+    "renameError": "Der Name konnte nicht gespeichert werden.",
+    "deductibleOpen": "Selbstbehalt: noch {{remaining}} von {{amount}}",
+    "deductibleReached": "Selbstbehalt von {{amount}} erreicht"
   },
   "table": {
     "date": "Datum",
@@ -52,14 +99,16 @@
     "DONE": "Ausgelesen",
     "FAILED": "Nicht lesbar"
   },
-  "field": { "fromPdf": "Aus PDF", "notRecognised": "Nicht erkannt" },
+  "field": {
+    "fromPdf": "Aus PDF",
+    "notRecognised": "Nicht erkannt"
+  },
   "form": {
     "person": "Person",
     "provider": "Arzt oder Klinik",
     "invoiceNumber": "Rechnungsnummer",
     "invoiceNumberPlaceholder": "z. B. RE-2026-00417",
     "invoiceDate": "Datum",
-    "datePlaceholder": "TT.MM.JJJJ",
     "amount": "Betrag",
     "description": "Beschreibung",
     "descriptionPlaceholder": "Optional"
@@ -83,7 +132,11 @@
     "editTitle": "Rechnung bearbeiten",
     "close": "Schließen",
     "stepsLabel": "Schritte",
-    "steps": { "type": "Person und Art", "reading": "Auslesen", "review": "Daten prüfen" },
+    "steps": {
+      "type": "Person und Art",
+      "reading": "Auslesen",
+      "review": "Daten prüfen"
+    },
     "mode": {
       "label": "Art",
       "upload": "PDF hochladen",
@@ -115,5 +168,39 @@
     "dropTitle": "PDF hierher ziehen oder Datei auswählen",
     "dropOver": "Loslassen zum Hinzufügen",
     "dropMeta": "Nur PDF, höchstens 10 MB"
+  },
+  "date": {
+    "open": "Kalender öffnen",
+    "choose": "Datum auswählen",
+    "prevMonth": "Vorheriger Monat",
+    "nextMonth": "Nächster Monat",
+    "month": "Monat",
+    "year": "Jahr",
+    "today": "Heute"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "back": "Zurück zu den Rechnungen",
+    "persons": {
+      "title": "Personen",
+      "text": "Namen und jährlicher Selbstbehalt der drei Personen. Der Selbstbehalt wird auf dem Dashboard mit den Rechnungen des gewählten Jahres verglichen.",
+      "name": "Name",
+      "deductible": "Selbstbehalt pro Jahr",
+      "deductibleHint": "Leer lassen oder 0 eingeben, wenn es keinen gibt.",
+      "deductibleInvalid": "Bitte gib einen Betrag von 0 bis 100.000 ein.",
+      "save": "Speichern",
+      "saved": "Die Einstellungen wurden gespeichert.",
+      "saveError": "Die Einstellungen konnten nicht gespeichert werden. Bitte versuche es erneut."
+    },
+    "format": {
+      "title": "Datum und Uhrzeit",
+      "text": "Wie Datum und Uhrzeit angezeigt werden. Das wird nur in diesem Browser gespeichert.",
+      "date": "Datumsformat",
+      "time": "Zeitformat",
+      "auto": "Wie die Sprache",
+      "24h": "24 Stunden",
+      "12h": "12 Stunden",
+      "preview": "Vorschau"
+    }
   }
 }

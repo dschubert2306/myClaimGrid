@@ -43,6 +43,9 @@ export function storageTake(kind: Kind, key: string): string | null {
 export const STORAGE_KEYS = {
   theme: 'mcg.theme',
   language: 'mcg.lang',
+  dateFormat: 'mcg.dateFormat',
+  timeFormat: 'mcg.timeFormat',
   returnTo: 'mcg.returnTo',
   signedOut: 'mcg.signedOut',
+  session: 'mcg.session',
 } as const;

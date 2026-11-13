@@ -66,6 +66,7 @@ export async function ensurePersons(sub: string): Promise<PersonItem[]> {
       personId,
       name: `Person ${index + 1}`,
       color,
+      deductible: 0,
       createdAt: now,
     };
   });

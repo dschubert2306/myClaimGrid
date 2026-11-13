@@ -3,9 +3,24 @@ import type { Page, Route } from '@playwright/test';
 /** An in-memory stand-in for the API. Same origin as the app, so there is no CORS to mock. */
 
 const PERSONS = [
-  { personId: '00000000-0000-4000-8000-000000000001', name: 'Anna', color: 'person-1' },
-  { personId: '00000000-0000-4000-8000-000000000002', name: 'Jonas', color: 'person-2' },
-  { personId: '00000000-0000-4000-8000-000000000003', name: 'Lea', color: 'person-3' },
+  {
+    personId: '00000000-0000-4000-8000-000000000001',
+    name: 'Anna',
+    color: 'person-1',
+    deductible: 0,
+  },
+  {
+    personId: '00000000-0000-4000-8000-000000000002',
+    name: 'Jonas',
+    color: 'person-2',
+    deductible: 0,
+  },
+  {
+    personId: '00000000-0000-4000-8000-000000000003',
+    name: 'Lea',
+    color: 'person-3',
+    deductible: 0,
+  },
 ];
 
 export interface MockClaim {
@@ -112,6 +127,7 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
       const person = api.persons.find((p) => p.personId === path.split('/')[2]);
       if (!person) return json(route, { error: { code: 'not_found' } }, 404);
       person.name = body.name;
+      if (body.deductible !== undefined) person.deductible = body.deductible;
       return json(route, person);
     }
 
