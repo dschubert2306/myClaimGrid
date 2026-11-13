@@ -1,0 +1,49 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--bg); }
+  .cover svg { position: absolute; left: 0; top: 0; }
+  .accent { fill: var(--accent); }
+  .ink { fill: var(--ink); }
+  .p1 { fill: var(--person-1); }
+  .p2 { fill: var(--person-2); }
+  .p3 { fill: var(--person-3); }
+  .rule { stroke: var(--line-strong); stroke-width: var(--border-hairline); opacity: .55; }
+  rect { rx: var(--radius); }
+  .text { position: absolute; left: 48px; bottom: 48px; max-width: 400px; }
+  .name { margin: 0; font-family: var(--font-sans); font-weight: 600; font-size: 64px; line-height: .95; letter-spacing: -0.03em; color: var(--ink); }
+  .tag { margin: 16px 0 0; font-family: var(--font-sans); font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <!--
+    blocks: accent 240x144 (5 x space-12 by 3), ink 96x288 (2 x space-12, full height, bleeds right), person-1 96x96, person-2 96x48, person-3 48x48
+    arrangement: flush modular grid on the 48px module, blocks touching edge to edge, ink slab on the right edge, the three persons as small satellites under the accent
+    pattern: geometric, modular, dense UI -> the module grid itself as hairlines; chosen because the product is literally a grid of claims with square corners (radius 0)
+    steps and radii: pitch space-12 (48px), gutter space-12, rule border-hairline in line-strong, rx radius (0)
+  -->
+  <svg width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+    <g class="rule">
+      <line x1="528" y1="0" x2="528" y2="288"/><line x1="576" y1="0" x2="576" y2="288"/><line x1="624" y1="0" x2="624" y2="288"/>
+      <line x1="672" y1="0" x2="672" y2="288"/><line x1="720" y1="0" x2="720" y2="288"/><line x1="768" y1="0" x2="768" y2="288"/>
+      <line x1="816" y1="0" x2="816" y2="288"/><line x1="864" y1="0" x2="864" y2="288"/>
+      <line x1="528" y1="48" x2="960" y2="48"/><line x1="528" y1="96" x2="960" y2="96"/><line x1="528" y1="144" x2="960" y2="144"/>
+      <line x1="528" y1="192" x2="960" y2="192"/><line x1="528" y1="240" x2="960" y2="240"/>
+    </g>
+    <rect class="accent" x="624" y="0" width="240" height="144"/>
+    <rect class="ink" x="864" y="0" width="96" height="288"/>
+    <rect class="p1" x="528" y="144" width="96" height="96"/>
+    <rect class="p2" x="720" y="144" width="96" height="48"/>
+    <rect class="p3" x="816" y="192" width="48" height="48"/>
+  </svg>
+  <div class="text">
+    <h1 class="name">myClaimGrid</h1>
+    <p class="tag">Health insurance claims, by person and year.</p>
+  </div>
+</div>
+</body>
+</html>

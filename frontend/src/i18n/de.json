@@ -1,0 +1,119 @@
+{
+  "topbar": {
+    "year": "Jahr",
+    "language": "Sprache",
+    "theme": "Darstellung",
+    "signOut": "Abmelden"
+  },
+  "theme": { "light": "Hell", "system": "System", "dark": "Dunkel" },
+  "login": {
+    "title": "Rechnungen im Blick",
+    "text": "Arzt- und Klinikrechnungen für alle drei Personen erfassen und pro Jahr auswerten.",
+    "signIn": "Anmelden",
+    "redirecting": "Weiterleitung …",
+    "meta": "Die Anmeldung läuft über eine gesicherte Seite von AWS. Danach geht es automatisch zurück.",
+    "invitationOnly": "Zugang nur auf Einladung.",
+    "signedOut": "Du wurdest abgemeldet.",
+    "error": "Die Anmeldung hat nicht geklappt. Bitte versuche es erneut."
+  },
+  "callback": { "completing": "Anmeldung wird abgeschlossen" },
+  "dashboard": {
+    "title": "Rechnungen {{year}}",
+    "newClaim": "Neue Rechnung",
+    "loading": "Daten werden geladen",
+    "loadError": "Die Daten konnten nicht geladen werden.",
+    "retry": "Erneut versuchen"
+  },
+  "empty": {
+    "title": "Noch keine Rechnungen für {{year}}",
+    "text": "Lade eine Rechnung als PDF hoch oder trage sie manuell ein. Sie erscheint danach hier bei der richtigen Person."
+  },
+  "person": {
+    "sum": "Summe {{year}}",
+    "count": "Rechnungen",
+    "rename": "Umbenennen",
+    "nameLabel": "Name",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "noClaims": "Für {{year}} noch keine Rechnungen.",
+    "renameError": "Der Name konnte nicht gespeichert werden."
+  },
+  "table": {
+    "date": "Datum",
+    "provider": "Arzt oder Klinik",
+    "invoiceNumber": "Rechnungsnr.",
+    "amount": "Betrag",
+    "status": "Status"
+  },
+  "status": {
+    "DRAFT": "Entwurf",
+    "OPEN": "Offen",
+    "PENDING": "Wird ausgelesen",
+    "DONE": "Ausgelesen",
+    "FAILED": "Nicht lesbar"
+  },
+  "field": { "fromPdf": "Aus PDF", "notRecognised": "Nicht erkannt" },
+  "form": {
+    "person": "Person",
+    "provider": "Arzt oder Klinik",
+    "invoiceNumber": "Rechnungsnummer",
+    "invoiceNumberPlaceholder": "z. B. RE-2026-00417",
+    "invoiceDate": "Datum",
+    "datePlaceholder": "TT.MM.JJJJ",
+    "amount": "Betrag",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Optional"
+  },
+  "errors": {
+    "required": "Bitte fülle dieses Feld aus.",
+    "date": "Bitte gib ein gültiges Datum ein.",
+    "amount": "Bitte gib einen Betrag größer als 0 ein.",
+    "maxLength": "Der Text ist zu lang.",
+    "person": "Bitte wähle eine Person aus.",
+    "file": "Bitte wähle eine PDF-Datei aus.",
+    "fileType": "Bitte wähle eine PDF-Datei aus. Andere Dateitypen sind nicht möglich.",
+    "fileSize": "Die Datei ist größer als 10 MB.",
+    "uploadFailed": "Das Hochladen hat nicht geklappt. Bitte versuche es erneut.",
+    "saveFailed": "Die Rechnung konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "deleteFailed": "Die Rechnung konnte nicht gelöscht werden. Bitte versuche es erneut.",
+    "loadClaimFailed": "Die Rechnung konnte nicht geladen werden."
+  },
+  "dialog": {
+    "newTitle": "Neue Rechnung",
+    "editTitle": "Rechnung bearbeiten",
+    "close": "Schließen",
+    "stepsLabel": "Schritte",
+    "steps": { "type": "Person und Art", "reading": "Auslesen", "review": "Daten prüfen" },
+    "mode": {
+      "label": "Art",
+      "upload": "PDF hochladen",
+      "uploadHint": "Die Daten werden aus der Rechnung ausgelesen.",
+      "manual": "Manuell erfassen",
+      "manualHint": "Ohne PDF, du trägst die Daten selbst ein."
+    },
+    "personPlaceholder": "Bitte wählen",
+    "for": "Für {{name}}",
+    "back": "Zurück",
+    "cancel": "Abbrechen",
+    "next": "Weiter",
+    "upload": "Hochladen",
+    "save": "Speichern",
+    "saving": "Rechnung wird gespeichert",
+    "delete": "Löschen",
+    "deleteClaim": "Rechnung löschen",
+    "confirmDelete": "Die Rechnung und die PDF-Datei werden gelöscht. Das lässt sich nicht rückgängig machen.",
+    "confirmDiscard": "Deine Eingaben gehen verloren. Verwerfen?",
+    "discardYes": "Verwerfen",
+    "keepEditing": "Weiter bearbeiten",
+    "uploading": "PDF wird hochgeladen",
+    "reading": "Rechnung wird ausgelesen",
+    "loading": "Rechnung wird geladen",
+    "extractionFailed": "Die Rechnung konnte nicht ausgelesen werden. Bitte trage die Daten selbst ein.",
+    "pdfPreview": "PDF-Vorschau",
+    "pdfFallback": "Die Vorschau wird in diesem Browser nicht unterstützt.",
+    "removeFile": "Datei entfernen",
+    "dropTitle": "PDF hierher ziehen oder Datei auswählen",
+    "dropOver": "Loslassen zum Hinzufügen",
+    "dropMeta": "Nur PDF, höchstens 10 MB"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules
+cdk.out
+dist
+.angular
+package-lock.json
+design-system
+frontend/dist
+frontend/.angular
+frontend/playwright-report
+frontend/test-results
+frontend/src/styles/tokens.scss
+frontend/src/styles/bundle.css

@@ -1,0 +1,317 @@
+<div class="mcg-scrim app-scrim" (keydown.escape)="onEscape($event)">
+  <div
+    class="mcg-dialog"
+    [class.mcg-dialog--narrow]="narrow()"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="claim-dialog-title"
+    cdkTrapFocus
+    [cdkTrapFocusAutoCapture]="true"
+  >
+    <div class="mcg-dialog__head">
+      <h2 class="mcg-dialog__title" id="claim-dialog-title">{{ title() | transloco }}</h2>
+      <button
+        mcg-button
+        variant="ghost"
+        [iconOnly]="true"
+        [attr.aria-label]="'dialog.close' | transloco"
+        (click)="requestClose()"
+      >
+        <mcg-icon name="close" />
+      </button>
+    </div>
+
+    @if (!isEdit) {
+      <ol class="mcg-steps" [attr.aria-label]="'dialog.stepsLabel' | transloco">
+        @for (label of steps(); track label; let i = $index) {
+          <li
+            [class.is-done]="i < stepIndex()"
+            [attr.aria-current]="i === stepIndex() ? 'step' : null"
+          >
+            <b>{{ i + 1 }}</b>{{ label | transloco }}
+          </li>
+        }
+      </ol>
+    }
+
+    @switch (step()) {
+      @case ('choose') {
+        <div class="mcg-dialog__body mcg-stack">
+          @if (error()) {
+            <mcg-notice variant="error">{{ error()! | transloco }}</mcg-notice>
+          }
+
+          <div class="mcg-field">
+            <div class="mcg-field__head">
+              <span class="mcg-label" id="mode-label">{{ 'dialog.mode.label' | transloco }}</span>
+            </div>
+            <div class="mcg-choice" role="radiogroup" aria-labelledby="mode-label">
+              <label [class.is-checked]="mode() === 'upload'">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="upload"
+                  data-first-focus
+                  cdkFocusInitial
+                  [checked]="mode() === 'upload'"
+                  (change)="mode.set('upload')"
+                />
+                {{ 'dialog.mode.upload' | transloco }}
+                <span>{{ 'dialog.mode.uploadHint' | transloco }}</span>
+              </label>
+              <label [class.is-checked]="mode() === 'manual'">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="manual"
+                  [checked]="mode() === 'manual'"
+                  (change)="mode.set('manual')"
+                />
+                {{ 'dialog.mode.manual' | transloco }}
+                <span>{{ 'dialog.mode.manualHint' | transloco }}</span>
+              </label>
+            </div>
+          </div>
+
+          <mcg-field
+            [label]="'form.person' | transloco"
+            inputId="dlg-person"
+            [error]="personError()"
+          >
+            <mcg-select
+              inputId="dlg-person"
+              [options]="personOptions()"
+              [placeholder]="'dialog.personPlaceholder' | transloco"
+              [invalid]="!!personError()"
+              [describedBy]="personError() ? 'dlg-person-error' : null"
+              [(value)]="personId"
+            />
+          </mcg-field>
+
+          @if (mode() === 'upload') {
+            <mcg-dropzone [(file)]="file" [error]="fileError()" />
+          }
+        </div>
+        <div class="mcg-dialog__foot">
+          <span class="mcg-topbar__spacer"></span>
+          <button mcg-button (click)="requestClose()">{{ 'dialog.cancel' | transloco }}</button>
+          <button mcg-button variant="primary" (click)="next()">
+            {{ (mode() === 'upload' ? 'dialog.upload' : 'dialog.next') | transloco }}
+          </button>
+        </div>
+      }
+
+      @case ('reading') {
+        <div class="mcg-dialog__body">
+          <mcg-progress
+            [label]="(phase() === 'uploading' ? 'dialog.uploading' : 'dialog.reading') | transloco"
+            [percent]="phase() === 'uploading' ? uploadPercent() : null"
+          >
+            @if (phase() === 'extracting') {
+              <mcg-status-badge status="PENDING" />
+            }
+          </mcg-progress>
+        </div>
+        <div class="mcg-dialog__foot">
+          <span class="mcg-topbar__spacer"></span>
+          <button mcg-button (click)="requestClose()">{{ 'dialog.cancel' | transloco }}</button>
+        </div>
+      }
+
+      @case ('review') {
+        @if (loadingExisting()) {
+          <div class="mcg-dialog__body">
+            <mcg-progress [label]="'dialog.loading' | transloco" [percent]="null" />
+          </div>
+        } @else if (isEdit && !claim()) {
+          <div class="mcg-dialog__body">
+            <mcg-notice variant="error">{{
+              error() ?? 'errors.loadClaimFailed' | transloco
+            }}</mcg-notice>
+          </div>
+        } @else if (showPdf()) {
+          <div class="mcg-dialog__split">
+            <div><ng-container *ngTemplateOutlet="formFields" /></div>
+            <div class="mcg-dialog__pdf">
+              <object
+                class="app-pdf"
+                type="application/pdf"
+                data-testid="pdf-preview"
+                [data]="pdfUrl()"
+                [attr.aria-label]="'dialog.pdfPreview' | transloco"
+              >
+                <p class="mcg-muted">{{ 'dialog.pdfFallback' | transloco }}</p>
+              </object>
+            </div>
+          </div>
+        } @else {
+          <div class="mcg-dialog__body mcg-stack">
+            <ng-container *ngTemplateOutlet="formFields" />
+          </div>
+        }
+
+        @if (saving()) {
+          <div class="mcg-dialog__body" style="padding-top: 0">
+            <mcg-progress [label]="'dialog.saving' | transloco" [percent]="null" />
+          </div>
+        }
+
+        <div class="mcg-dialog__foot">
+          @switch (confirm()) {
+            @case ('discard') {
+              <mcg-notice class="app-grow">{{ 'dialog.confirmDiscard' | transloco }}</mcg-notice>
+              <button mcg-button (click)="confirm.set(null)">
+                {{ 'dialog.keepEditing' | transloco }}
+              </button>
+              <button mcg-button variant="danger" (click)="discardAndClose()">
+                {{ 'dialog.discardYes' | transloco }}
+              </button>
+            }
+            @case ('delete') {
+              <mcg-notice class="app-grow">{{ 'dialog.confirmDelete' | transloco }}</mcg-notice>
+              <button mcg-button (click)="confirm.set(null)">
+                {{ 'dialog.cancel' | transloco }}
+              </button>
+              <button mcg-button variant="danger" (click)="deleteClaim()">
+                {{ 'dialog.deleteClaim' | transloco }}
+              </button>
+            }
+            @default {
+              @if (isEdit) {
+                <button
+                  mcg-button
+                  variant="danger"
+                  [disabled]="!claim()"
+                  (click)="confirm.set('delete')"
+                >
+                  {{ 'dialog.delete' | transloco }}
+                </button>
+              } @else if (canGoBack()) {
+                <button mcg-button (click)="back()">{{ 'dialog.back' | transloco }}</button>
+              }
+              <span class="mcg-topbar__spacer"></span>
+              <button mcg-button (click)="requestClose()">{{ 'dialog.cancel' | transloco }}</button>
+              @if (!isEdit || claim()) {
+                <button mcg-button variant="primary" type="submit" form="claim-form">
+                  {{ 'dialog.save' | transloco }}
+                </button>
+              }
+            }
+          }
+        </div>
+      }
+    }
+  </div>
+</div>
+
+<ng-template #formFields>
+  @if (error() && step() === 'review') {
+    <mcg-notice variant="error">{{ error()! | transloco }}</mcg-notice>
+  }
+  @if (extractionFailed()) {
+    <mcg-notice variant="error">{{ 'dialog.extractionFailed' | transloco }}</mcg-notice>
+  }
+  <div class="mcg-row" style="justify-content: space-between">
+    <span class="mcg-label">{{ 'dialog.for' | transloco: { name: personName() } }}</span>
+    @if (claim()?.extractionStatus; as extraction) {
+      @if (!isEdit) {
+        <mcg-status-badge [status]="extraction" />
+      }
+    }
+  </div>
+
+  <form class="mcg-stack" id="claim-form" novalidate [formGroup]="form" (ngSubmit)="save()">
+    <mcg-field
+      [label]="'form.provider' | transloco"
+      inputId="f-provider"
+      [tag]="tagFor('provider')"
+      [error]="errorText('provider')"
+    >
+      <input
+        id="f-provider"
+        class="mcg-input"
+        formControlName="provider"
+        autocomplete="off"
+        maxlength="200"
+        data-first-focus
+        [attr.aria-invalid]="errorText('provider') ? true : null"
+        [attr.aria-describedby]="describedBy('provider')"
+      />
+    </mcg-field>
+
+    <mcg-field
+      [label]="'form.invoiceNumber' | transloco"
+      inputId="f-invoiceNumber"
+      [tag]="tagFor('invoiceNumber')"
+      [error]="errorText('invoiceNumber')"
+    >
+      <input
+        id="f-invoiceNumber"
+        class="mcg-input mcg-mono"
+        formControlName="invoiceNumber"
+        autocomplete="off"
+        maxlength="100"
+        [placeholder]="'form.invoiceNumberPlaceholder' | transloco"
+        [attr.aria-invalid]="errorText('invoiceNumber') ? true : null"
+        [attr.aria-describedby]="describedBy('invoiceNumber')"
+      />
+    </mcg-field>
+
+    <div class="mcg-fields-2">
+      <mcg-field
+        [label]="'form.invoiceDate' | transloco"
+        inputId="f-invoiceDate"
+        [tag]="tagFor('invoiceDate')"
+        [error]="errorText('invoiceDate')"
+      >
+        <input
+          id="f-invoiceDate"
+          class="mcg-input mcg-num"
+          formControlName="invoiceDate"
+          autocomplete="off"
+          inputmode="numeric"
+          [placeholder]="'form.datePlaceholder' | transloco"
+          [attr.aria-invalid]="errorText('invoiceDate') ? true : null"
+          [attr.aria-describedby]="describedBy('invoiceDate')"
+          (blur)="normalize('invoiceDate')"
+        />
+      </mcg-field>
+      <mcg-field
+        [label]="'form.amount' | transloco"
+        inputId="f-amount"
+        [tag]="tagFor('amount')"
+        [error]="errorText('amount')"
+      >
+        <div class="mcg-input-wrap">
+          <input
+            id="f-amount"
+            class="mcg-input mcg-input--amount"
+            formControlName="amount"
+            autocomplete="off"
+            inputmode="decimal"
+            [attr.aria-invalid]="errorText('amount') ? true : null"
+            [attr.aria-describedby]="describedBy('amount')"
+            (blur)="normalize('amount')"
+          />
+          <span class="mcg-input-suffix" aria-hidden="true">€</span>
+        </div>
+      </mcg-field>
+    </div>
+
+    <mcg-field
+      [label]="'form.description' | transloco"
+      inputId="f-description"
+      [error]="errorText('description')"
+    >
+      <textarea
+        id="f-description"
+        class="mcg-input"
+        formControlName="description"
+        maxlength="500"
+        [placeholder]="'form.descriptionPlaceholder' | transloco"
+        [attr.aria-invalid]="errorText('description') ? true : null"
+        [attr.aria-describedby]="describedBy('description')"
+      ></textarea>
+    </mcg-field>
+  </form>
+</ng-template>

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./dist/out-tsc/spec", "noEmit": true, "types": ["node"] },
+  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "exclude": ["src/testing/auth-providers.e2e.ts"]
+}

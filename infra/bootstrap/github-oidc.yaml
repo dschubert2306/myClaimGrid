@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  myclaimgrid, one-time setup for GitHub Actions deployments. Creates the GitHub OIDC identity
+  provider (optional) and a deploy role that can only assume the CDK bootstrap roles.
+  Applied once by the account owner, never by the pipeline. See README, section "One-time AWS setup".
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Description: GitHub user or organization that owns the repository.
+  GitHubRepo:
+    Type: String
+    Default: myClaimGrid
+    Description: Repository name.
+  GitHubEnvironment:
+    Type: String
+    Default: prod
+    Description: GitHub environment whose jobs may assume the role.
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: Set to false if the account already has the token.actions.githubusercontent.com provider (only one can exist).
+  CdkQualifier:
+    Type: String
+    Default: hnb659fds
+    Description: Qualifier used by `cdk bootstrap` (default is hnb659fds).
+
+Conditions:
+  CreateProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: [6938fd4d98bab03faadb97b34396831e3780aea1]
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: myclaimgrid-github-deploy
+      Description: Assumed by the deploy job of this repository, environment only.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateProvider
+                - !Ref GitHubOidcProvider
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # A job in an environment gets this subject. The branch is limited to main by the
+                # environment's "Deployment branches" rule in GitHub (see README).
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOwner}/${GitHubRepo}:environment:${GitHubEnvironment}
+      Policies:
+        - PolicyName: assume-cdk-bootstrap-roles
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-deploy-role-${AWS::AccountId}-${AWS::Region}
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-file-publishing-role-${AWS::AccountId}-${AWS::Region}
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-image-publishing-role-${AWS::AccountId}-${AWS::Region}
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-lookup-role-${AWS::AccountId}-${AWS::Region}
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/${CdkQualifier}/version
+
+Outputs:
+  DeployRoleArn:
+    Description: Store this as the GitHub environment variable AWS_DEPLOY_ROLE_ARN (a variable, not a secret).
+    Value: !GetAtt DeployRole.Arn

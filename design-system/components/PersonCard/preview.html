@@ -1,0 +1,24 @@
+<!-- @dsCard group="Data" height=380 width=1100 subtitle="Dashboard column per person" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><style></style></head>
+<body>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-6)">
+<section class="mcg-person" style="--person:var(--person-1)">
+<div class="mcg-person__head"><h2 class="mcg-person__name">Anna</h2><button class="mcg-btn mcg-btn--sm mcg-btn--ghost">Umbenennen</button></div>
+<div class="mcg-person__stats"><div><div class="mcg-label">Summe 2026</div><div class="mcg-person__total">1.234,56 €</div></div><div><div class="mcg-label" style="text-align:right">Rechnungen</div><div class="mcg-person__count">3</div></div></div>
+<table class="mcg-table"><thead><tr><th>Datum</th><th>Arzt oder Klinik</th><th class="mcg-table__amount" style="font-size:12px">Betrag</th></tr></thead><tbody><tr><td class="mcg-num">12.03.2026</td><td class="mcg-table__provider">Praxis Dr. Huber</td><td class="mcg-table__amount">89,40 €</td></tr><tr><td class="mcg-num">27.02.2026</td><td class="mcg-table__provider">Klinikum Rechts der Isar</td><td class="mcg-table__amount">1.042,16 €</td></tr><tr><td class="mcg-num">03.02.2026</td><td class="mcg-table__provider">Zahnarztpraxis Berger</td><td class="mcg-table__amount">103,00 €</td></tr></tbody></table>
+</section>
+<section class="mcg-person" style="--person:var(--person-2)">
+<div class="mcg-person__head"><h2 class="mcg-person__name">Jonas</h2><button class="mcg-btn mcg-btn--sm mcg-btn--ghost">Umbenennen</button></div>
+<div class="mcg-person__stats"><div><div class="mcg-label">Summe 2026</div><div class="mcg-person__total">64,12 €</div></div><div><div class="mcg-label" style="text-align:right">Rechnungen</div><div class="mcg-person__count">1</div></div></div>
+<table class="mcg-table"><thead><tr><th>Datum</th><th>Arzt oder Klinik</th><th class="mcg-table__amount" style="font-size:12px">Betrag</th></tr></thead><tbody><tr><td class="mcg-num">20.01.2026</td><td class="mcg-table__provider">Kinderarztpraxis Sonnenstraße</td><td class="mcg-table__amount">64,12 €</td></tr></tbody></table>
+</section>
+<section class="mcg-person" style="--person:var(--person-3)">
+<div class="mcg-person__head"><h2 class="mcg-person__name">Lea</h2><button class="mcg-btn mcg-btn--sm mcg-btn--ghost">Umbenennen</button></div>
+<div class="mcg-person__stats"><div><div class="mcg-label">Summe 2026</div><div class="mcg-person__total">0,00 €</div></div><div><div class="mcg-label" style="text-align:right">Rechnungen</div><div class="mcg-person__count">0</div></div></div>
+<p class="mcg-muted" style="margin:0;padding:var(--space-6);font-size:13px;line-height:20px">Für 2026 noch keine Rechnungen.</p>
+</section>
+</div>
+</body>
+</html>

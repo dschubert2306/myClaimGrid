@@ -1,0 +1,31 @@
+<!-- @dsCard group="Forms" height=300 subtitle="Default, extracted, not recognised, error, amount" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><style></style></head>
+<body>
+<div class="mcg-fields-2" style="max-width:640px">
+<div class="mcg-field">
+<div class="mcg-field__head"><label for="p">Arzt oder Klinik</label><span class="mcg-tag mcg-tag--extracted">Aus PDF</span></div>
+<input id="p" class="mcg-input" value="Praxis Dr. Huber">
+</div>
+<div class="mcg-field mcg-field--missing">
+<div class="mcg-field__head"><label for="n">Rechnungsnummer</label><span class="mcg-tag mcg-tag--missing">Nicht erkannt</span></div>
+<input id="n" class="mcg-input mcg-mono" placeholder="z. B. RE-2026-00417">
+</div>
+<div class="mcg-field mcg-field--error">
+<div class="mcg-field__head"><label for="d">Rechnungsdatum</label></div>
+<input id="d" class="mcg-input mcg-num" value="31.02.2026" aria-invalid="true" aria-describedby="de">
+<span id="de" class="mcg-field__error">Bitte gib ein gültiges Datum ein.</span>
+</div>
+<div class="mcg-field">
+<div class="mcg-field__head"><label for="a">Betrag</label><span class="mcg-tag mcg-tag--extracted">Aus PDF</span></div>
+<div class="mcg-input-wrap"><input id="a" class="mcg-input mcg-input--amount" value="1.234,56" inputmode="decimal"><span class="mcg-input-suffix">€</span></div>
+</div>
+<div class="mcg-field" style="grid-column:1/-1">
+<div class="mcg-field__head"><label for="t">Beschreibung</label></div>
+<textarea id="t" class="mcg-input" placeholder="Optional"></textarea>
+<span class="mcg-field__hint">Wird nur hier angezeigt.</span>
+</div>
+</div>
+</body>
+</html>

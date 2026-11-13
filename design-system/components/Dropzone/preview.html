@@ -1,0 +1,13 @@
+<!-- @dsCard group="Forms" height=300 width=900 subtitle="Idle, drag over, error, file chosen" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><style></style></head>
+<body>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+<div class="mcg-drop" role="button" tabindex="0"><svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V4M6 8l4-4 4 4M4 13v3h12v-3"/></svg><div class="mcg-drop__title">PDF hierher ziehen oder Datei auswählen</div><div class="mcg-drop__meta">Nur PDF, höchstens 10 MB</div></div>
+<div class="mcg-drop mcg-drop--over"><svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V4M6 8l4-4 4 4M4 13v3h12v-3"/></svg><div class="mcg-drop__title">Loslassen zum Hinzufügen</div><div class="mcg-drop__meta">Nur PDF, höchstens 10 MB</div></div>
+<div class="mcg-stack" style="gap:var(--space-2)"><div class="mcg-drop mcg-drop--error" style="min-height:120px"><svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V4M6 8l4-4 4 4M4 13v3h12v-3"/></svg><div class="mcg-drop__title">PDF hierher ziehen oder Datei auswählen</div></div><span class="mcg-field__error">Die Datei ist größer als 10 MB.</span></div>
+<div class="mcg-file"><svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.75h6.5L15 6.25v11H5z"/><path d="M11.5 2.75v3.5H15"/></svg><span class="mcg-file__name">Rechnung_Huber_2026-03.pdf</span><span class="mcg-muted mcg-num" style="font-size:13px">412 KB</span><button class="mcg-btn mcg-btn--ghost mcg-btn--icon" aria-label="Datei entfernen"><svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>
+</div>
+</body>
+</html>

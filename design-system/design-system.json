@@ -1,0 +1,25 @@
+{
+  "v": 3,
+  "assetGroups": {},
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-11-13T14:33:40Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "groups": [],
+  "lastChange": {
+    "by": "Daniel Marcus",
+    "at": "2026-11-13T14:50:56Z",
+    "via": "Cowork",
+    "note": "Added LoginPage and Notice styles for the Cognito sign-in"
+  },
+  "layout": "files",
+  "libraries": [],
+  "namespace": "MyClaimGrid",
+  "sections": {},
+  "title": "myClaimGrid"
+}

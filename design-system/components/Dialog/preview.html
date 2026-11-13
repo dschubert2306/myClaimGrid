@@ -1,0 +1,29 @@
+<!-- @dsCard group="Overlays" height=620 width=1100 subtitle="New claim, review step" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><style></style></head>
+<body>
+<div class="mcg-scrim" style="margin:calc(-1*var(--space-6))">
+<div class="mcg-dialog" role="dialog" aria-modal="true" aria-labelledby="dt">
+<div class="mcg-dialog__head"><h2 class="mcg-dialog__title" id="dt">Neue Rechnung</h2><button class="mcg-btn mcg-btn--ghost mcg-btn--icon" aria-label="Schließen"><svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>
+<ol class="mcg-steps"><li class="is-done"><b>1</b>Person und Art</li><li class="is-done"><b>2</b>Auslesen</li><li aria-current="step"><b>3</b>Daten prüfen</li></ol>
+<div class="mcg-dialog__split">
+<div>
+<div class="mcg-row" style="justify-content:space-between"><span class="mcg-label">Für Anna</span><span class="mcg-badge mcg-badge--done">Ausgelesen</span></div>
+<div class="mcg-field"><div class="mcg-field__head"><label for="p">Arzt oder Klinik</label><span class="mcg-tag mcg-tag--extracted">Aus PDF</span></div><input id="p" class="mcg-input" value="Praxis Dr. Huber"></div>
+<div class="mcg-field mcg-field--missing"><div class="mcg-field__head"><label for="n">Rechnungsnummer</label><span class="mcg-tag mcg-tag--missing">Nicht erkannt</span></div><input id="n" class="mcg-input mcg-mono"></div>
+<div class="mcg-fields-2">
+<div class="mcg-field"><div class="mcg-field__head"><label for="d">Datum</label><span class="mcg-tag mcg-tag--extracted">Aus PDF</span></div><input id="d" class="mcg-input mcg-num" value="12.03.2026"></div>
+<div class="mcg-field"><div class="mcg-field__head"><label for="a">Betrag</label><span class="mcg-tag mcg-tag--extracted">Aus PDF</span></div><div class="mcg-input-wrap"><input id="a" class="mcg-input mcg-input--amount" value="89,40"><span class="mcg-input-suffix">€</span></div></div>
+</div>
+<div class="mcg-field"><div class="mcg-field__head"><label for="t">Beschreibung</label></div><textarea id="t" class="mcg-input" placeholder="Optional"></textarea></div>
+</div>
+<div class="mcg-dialog__pdf"><div style="width:100%;max-width:420px;aspect-ratio:1/1.414;background:var(--surface);border:1px solid var(--line);padding:var(--space-6);display:flex;flex-direction:column;gap:10px">
+<i style="display:block;height:10px;width:45%;background:var(--line)"></i><i style="display:block;height:6px;width:30%;background:var(--line)"></i><i style="display:block;height:6px;width:60%;background:var(--line);margin-top:24px"></i><i style="display:block;height:6px;width:80%;background:var(--line)"></i><i style="display:block;height:6px;width:70%;background:var(--line)"></i><i style="display:block;height:6px;width:25%;background:var(--line-strong);margin-top:auto;align-self:flex-end"></i>
+</div></div>
+</div>
+<div class="mcg-dialog__foot"><button class="mcg-btn">Zurück</button><span class="mcg-topbar__spacer"></span><button class="mcg-btn">Abbrechen</button><button class="mcg-btn mcg-btn--primary">Speichern</button></div>
+</div>
+</div>
+</body>
+</html>

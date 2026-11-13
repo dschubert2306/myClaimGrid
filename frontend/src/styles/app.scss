@@ -1,0 +1,126 @@
+/* App layout on top of the design system. Only tokens, no new colors, spacings or radii. */
+body {
+  padding: 0;
+}
+[hidden] {
+  display: none !important;
+}
+
+.app-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-8);
+}
+.app-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.app-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.app-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+.app-grow {
+  flex: 1;
+  min-width: 0;
+}
+.app-center {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+.app-center__box {
+  width: min(360px, calc(100vw - 2 * var(--space-4)));
+}
+
+@media (min-width: 1024px) {
+  .app-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 639.98px) {
+  .app-content {
+    padding: var(--space-4);
+  }
+  /* Five controls do not fit one 390px row: the tools wrap below the name. */
+  .mcg-topbar {
+    height: auto;
+    min-height: var(--topbar-height);
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    gap: var(--space-2);
+  }
+  .mcg-topbar__spacer {
+    display: none;
+  }
+  .mcg-topbar__tools {
+    flex-wrap: wrap;
+    margin-left: auto;
+    gap: var(--space-2);
+  }
+}
+
+/* Person card: the table drops invoice number and status when the card is narrow. */
+.mcg-person {
+  container-type: inline-size;
+}
+@container (max-width: 419px) {
+  .mcg-table__invoice,
+  .mcg-table__status {
+    display: none;
+  }
+}
+
+/* Claim dialog */
+.app-scrim {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+}
+.app-pdf {
+  width: 100%;
+  height: min(70vh, 720px);
+  min-height: 420px;
+  border: 0;
+  background: var(--surface);
+}
+.mcg-choice label {
+  position: relative;
+}
+.mcg-choice label:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (max-width: 899.98px) {
+  .mcg-dialog__split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mcg-dialog__pdf {
+    border-left: 0;
+    border-top: var(--border-hairline) solid var(--line);
+  }
+}
+
+/* Tags and labels stay on one line, a long label shrinks instead of pushing the tag down. */
+.mcg-tag {
+  white-space: nowrap;
+}
+.mcg-field__head label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

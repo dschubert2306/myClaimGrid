@@ -1,0 +1,8 @@
+{
+  "region": "eu-central-1",
+  "apiUrl": "https://<api-id>.execute-api.eu-central-1.amazonaws.com",
+  "userPoolId": "eu-central-1_XXXXXXXXX",
+  "clientId": "<user pool client id>",
+  "authority": "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_XXXXXXXXX",
+  "hostedUiUrl": "https://<domain prefix>.auth.eu-central-1.amazoncognito.com"
+}

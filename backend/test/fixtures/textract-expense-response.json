@@ -1,0 +1,38 @@
+{
+  "_comment": "Synthetic, anonymized AnalyzeExpense response. Contains decoy bank fields that must never be mapped.",
+  "ExpenseDocuments": [
+    {
+      "SummaryFields": [
+        {
+          "Type": { "Text": "VENDOR_NAME" },
+          "ValueDetection": { "Text": "Praxis Dr. Beispiel", "Confidence": 98.44 }
+        },
+        {
+          "Type": { "Text": "INVOICE_RECEIPT_ID" },
+          "ValueDetection": { "Text": "R-2026-0042", "Confidence": 95.12 }
+        },
+        {
+          "Type": { "Text": "INVOICE_RECEIPT_DATE" },
+          "ValueDetection": { "Text": "Datum: 12.03.2026", "Confidence": 97.0 }
+        },
+        {
+          "Type": { "Text": "SUBTOTAL" },
+          "ValueDetection": { "Text": "1.000,00 €", "Confidence": 90.0 }
+        },
+        {
+          "Type": { "Text": "TOTAL" },
+          "ValueDetection": { "Text": "1.234,56 €", "Confidence": 93.25 }
+        },
+        {
+          "Type": { "Text": "ACCOUNT_NUMBER" },
+          "ValueDetection": { "Text": "DE02 1203 0000 0000 2020 51", "Confidence": 90.0 }
+        },
+        {
+          "Type": { "Text": "OTHER" },
+          "LabelDetection": { "Text": "BIC" },
+          "ValueDetection": { "Text": "BYLADEM1001", "Confidence": 88.0 }
+        }
+      ]
+    }
+  ]
+}

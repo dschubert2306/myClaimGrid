@@ -1,0 +1,119 @@
+{
+  "topbar": {
+    "year": "Year",
+    "language": "Language",
+    "theme": "Appearance",
+    "signOut": "Sign out"
+  },
+  "theme": { "light": "Light", "system": "System", "dark": "Dark" },
+  "login": {
+    "title": "Your claims at a glance",
+    "text": "Record doctor and hospital invoices for all three persons and review them per year.",
+    "signIn": "Sign in",
+    "redirecting": "Redirecting …",
+    "meta": "Sign-in happens on a secure AWS page. You will be sent back automatically.",
+    "invitationOnly": "Access by invitation only.",
+    "signedOut": "You have been signed out.",
+    "error": "Sign-in did not work. Please try again."
+  },
+  "callback": { "completing": "Completing sign-in" },
+  "dashboard": {
+    "title": "Claims {{year}}",
+    "newClaim": "New claim",
+    "loading": "Loading data",
+    "loadError": "The data could not be loaded.",
+    "retry": "Try again"
+  },
+  "empty": {
+    "title": "No claims for {{year}} yet",
+    "text": "Upload an invoice as a PDF or enter it manually. It will then appear here under the right person."
+  },
+  "person": {
+    "sum": "Total {{year}}",
+    "count": "Claims",
+    "rename": "Rename",
+    "nameLabel": "Name",
+    "save": "Save",
+    "cancel": "Cancel",
+    "noClaims": "No claims for {{year}} yet.",
+    "renameError": "The name could not be saved."
+  },
+  "table": {
+    "date": "Date",
+    "provider": "Doctor or hospital",
+    "invoiceNumber": "Invoice no.",
+    "amount": "Amount",
+    "status": "Status"
+  },
+  "status": {
+    "DRAFT": "Draft",
+    "OPEN": "Open",
+    "PENDING": "Reading",
+    "DONE": "Read",
+    "FAILED": "Could not read"
+  },
+  "field": { "fromPdf": "From PDF", "notRecognised": "Not recognised" },
+  "form": {
+    "person": "Person",
+    "provider": "Doctor or hospital",
+    "invoiceNumber": "Invoice number",
+    "invoiceNumberPlaceholder": "e.g. RE-2026-00417",
+    "invoiceDate": "Date",
+    "datePlaceholder": "DD/MM/YYYY",
+    "amount": "Amount",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional"
+  },
+  "errors": {
+    "required": "Please fill in this field.",
+    "date": "Please enter a valid date.",
+    "amount": "Please enter an amount greater than 0.",
+    "maxLength": "The text is too long.",
+    "person": "Please choose a person.",
+    "file": "Please choose a PDF file.",
+    "fileType": "Please choose a PDF file. Other file types are not supported.",
+    "fileSize": "The file is larger than 10 MB.",
+    "uploadFailed": "The upload did not work. Please try again.",
+    "saveFailed": "The claim could not be saved. Please try again.",
+    "deleteFailed": "The claim could not be deleted. Please try again.",
+    "loadClaimFailed": "The claim could not be loaded."
+  },
+  "dialog": {
+    "newTitle": "New claim",
+    "editTitle": "Edit claim",
+    "close": "Close",
+    "stepsLabel": "Steps",
+    "steps": { "type": "Person and type", "reading": "Reading", "review": "Review data" },
+    "mode": {
+      "label": "Type",
+      "upload": "Upload PDF",
+      "uploadHint": "The data is read from the invoice.",
+      "manual": "Enter manually",
+      "manualHint": "Without a PDF, you enter the data yourself."
+    },
+    "personPlaceholder": "Please choose",
+    "for": "For {{name}}",
+    "back": "Back",
+    "cancel": "Cancel",
+    "next": "Next",
+    "upload": "Upload",
+    "save": "Save",
+    "saving": "Saving the claim",
+    "delete": "Delete",
+    "deleteClaim": "Delete claim",
+    "confirmDelete": "The claim and its PDF file will be deleted. This cannot be undone.",
+    "confirmDiscard": "Your changes will be lost. Discard them?",
+    "discardYes": "Discard",
+    "keepEditing": "Keep editing",
+    "uploading": "Uploading PDF",
+    "reading": "Reading the invoice",
+    "loading": "Loading the claim",
+    "extractionFailed": "The invoice could not be read. Please enter the data yourself.",
+    "pdfPreview": "PDF preview",
+    "pdfFallback": "This browser cannot show the preview.",
+    "removeFile": "Remove file",
+    "dropTitle": "Drag a PDF here or choose a file",
+    "dropOver": "Release to add",
+    "dropMeta": "PDF only, 10 MB at most"
+  }
+}
