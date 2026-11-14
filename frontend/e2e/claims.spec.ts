@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { PDF, mockBackend, signedIn, type MockApi } from './support';
 
 // Fixed language so the assertions read the same everywhere.
@@ -100,7 +100,7 @@ test.describe('dashboard and claims', () => {
       timeout: 15_000,
     });
     expect(api.uploadedFiles).toBe(1);
-    await expect(dialog.getByTestId('pdf-preview')).toHaveAttribute('data', /mock\.pdf$/);
+    await expect(dialog.getByTestId('pdf-preview')).toHaveAttribute('src', /mock\.pdf$/);
     await expect(dialog.getByLabel('Datum')).toHaveValue('12.03.2026');
     await expect(dialog.getByLabel('Betrag')).toHaveValue('89,40');
 
@@ -272,6 +272,10 @@ test.describe('dashboard and claims', () => {
   });
 });
 
+/** The calendar of the invoice date (the form also has submission and payment dates). */
+const invoiceCalendar = (dialog: Locator) =>
+  dialog.locator('mcg-field:has(#f-invoiceDate)').getByRole('button', { name: 'Kalender öffnen' });
+
 test.describe('calendar', () => {
   test.beforeEach(async ({ page }) => {
     await signedIn(page);
@@ -286,7 +290,7 @@ test.describe('calendar', () => {
 
   test('picks a date from the calendar and writes it in the date format', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
-    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await invoiceCalendar(dialog).click();
     const calendar = dialog.getByRole('dialog', { name: 'Datum auswählen' });
     await expect(calendar).toBeVisible();
 
@@ -303,7 +307,7 @@ test.describe('calendar', () => {
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
     const field = dialog.getByLabel('Datum', { exact: true });
     await field.fill('31.01.2026');
-    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await invoiceCalendar(dialog).click();
     const selected = dialog.getByRole('gridcell', { selected: true });
     await expect(selected).toHaveAccessibleName(/31\. Januar 2026/);
     await expect(selected).toBeFocused();
@@ -318,12 +322,12 @@ test.describe('calendar', () => {
 
   test('Escape closes only the calendar, an outside click closes it too', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
-    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await invoiceCalendar(dialog).click();
     await page.keyboard.press('Escape');
     await expect(dialog.getByRole('dialog', { name: 'Datum auswählen' })).toBeHidden();
     await expect(dialog).toBeVisible(); // the claim dialog stays
 
-    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await invoiceCalendar(dialog).click();
     await dialog.getByLabel('Rechnungsnummer').click();
     await expect(dialog.getByRole('dialog', { name: 'Datum auswählen' })).toBeHidden();
   });
@@ -331,7 +335,7 @@ test.describe('calendar', () => {
   test('"Heute" fills today and a typed date still works and is validated', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
     const field = dialog.getByLabel('Datum', { exact: true });
-    await dialog.getByRole('button', { name: 'Kalender öffnen' }).click();
+    await invoiceCalendar(dialog).click();
     await dialog.getByRole('button', { name: 'Heute' }).click();
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');

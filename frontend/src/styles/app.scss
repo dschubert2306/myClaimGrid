@@ -304,3 +304,241 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Reimbursement tracking. Tokens only, see README "Design system gaps". */
+.app-small {
+  font-size: 13px;
+  line-height: 20px;
+}
+.app-section-title {
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.app-badge-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+.app-badge-note {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+
+/* Three figures under the totals of a person card, and the summary in the detail view */
+.app-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: var(--border-hairline) solid var(--line);
+}
+.app-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.app-figures dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.app-figures--flush {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-4);
+  padding: 0;
+  border-bottom: 0;
+}
+
+/* Claim form: submission and payment */
+.app-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Reimbursement section of the claim dialog */
+.app-reimbursement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  padding-top: var(--space-6);
+  border-top: var(--border-hairline) solid var(--line);
+}
+.app-reimbursement__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.app-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--border-hairline) solid var(--line);
+}
+.app-history__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-hairline) solid var(--line);
+}
+.app-history__row,
+.app-history__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.app-history__note {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.app-history__doc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.app-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--control-sm);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.app-doc-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-doc-link:hover span {
+  text-decoration: underline;
+}
+.app-doc-link svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.app-select--full {
+  display: flex;
+}
+.app-select--full select {
+  width: 100%;
+}
+.app-drop--compact {
+  min-height: 120px;
+}
+/* The entry dialog sits above the claim dialog */
+.app-scrim--nested {
+  z-index: 1;
+}
+
+/* List view: filters and the full width table */
+.app-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface);
+  border: var(--border-hairline) solid var(--line);
+}
+.app-filters .mcg-field {
+  min-width: 180px;
+}
+.app-filters .mcg-select,
+.app-filters .mcg-select select {
+  width: 100%;
+}
+.app-filters__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.app-list {
+  background: var(--surface);
+  border: var(--border-hairline) solid var(--line);
+}
+.app-list__count {
+  margin: 0;
+  padding: var(--space-3) var(--space-6);
+  font-size: 13px;
+  line-height: 20px;
+  border-bottom: var(--border-hairline) solid var(--line);
+}
+.app-list__empty {
+  margin: 0;
+  padding: var(--space-6);
+}
+.app-list__scroll {
+  overflow-x: auto;
+}
+.app-list-table tfoot th,
+.app-list-table tfoot td {
+  height: 40px;
+  background: var(--surface-sunken);
+  font-weight: 600;
+}
+.app-list-table__total-label {
+  text-align: left;
+}
+.app-person-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.app-person-mark::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--person, var(--person-1));
+}
+@media (max-width: 899.98px) {
+  .app-list-table__invoice {
+    display: none;
+  }
+}
+@media (max-width: 639.98px) {
+  .app-filters {
+    padding: var(--space-4);
+  }
+  .app-filters .mcg-field {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .app-filters__actions {
+    margin-left: 0;
+  }
+  .app-figures {
+    padding: var(--space-3) var(--space-4);
+  }
+}

@@ -1,4 +1,11 @@
 import type { Page, Route } from '@playwright/test';
+import {
+  checkNewEntry,
+  createEntryRequestSchema,
+  reimbursementTotals,
+  sortEntries,
+  type ReimbursementEntry,
+} from '@myclaimgrid/shared';
 
 /** An in-memory stand-in for the API. Same origin as the app, so there is no CORS to mock. */
 
@@ -38,6 +45,10 @@ export interface MockClaim {
   hasPdf: boolean;
   extractionStatus: 'PENDING' | 'DONE' | 'FAILED' | null;
   extraction: { confidence: Record<string, number> } | null;
+  submittedAt: string | null;
+  paidAt: string | null;
+  /** History as the API returns it, the totals are derived on every response. */
+  entries: ReimbursementEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +60,20 @@ export interface MockApi {
   /** What the extraction "reads" from the next uploaded PDF. */
   extraction: 'DONE' | 'FAILED';
   uploadedFiles: number;
+  /** Upload ids handed out by POST /claims/{id}/documents, per claim. */
+  stagedUploads: Map<string, string>;
+  /** Documents that were opened through a signed link. */
+  openedDocuments: string[];
+}
+
+/** The claim as the API sends it: totals derived from the history, like the backend does. */
+function toApi(claim: MockClaim) {
+  const { entries, ...rest } = claim;
+  const sorted = sortEntries(entries);
+  return {
+    ...rest,
+    reimbursement: { ...reimbursementTotals(claim.amount, sorted), entries: sorted },
+  };
 }
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -64,6 +89,8 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
     requests: [],
     extraction: 'DONE',
     uploadedFiles: 0,
+    stagedUploads: new Map(),
+    openedDocuments: [],
   };
   const now = '2026-03-12T10:00:00.000Z';
 
@@ -83,6 +110,9 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
       hasPdf: false,
       extractionStatus: null,
       extraction: null,
+      submittedAt: null,
+      paidAt: null,
+      entries: [],
       createdAt: now,
       updatedAt: now,
       ...partial,
@@ -107,6 +137,12 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
     api.uploadedFiles += 1;
     // The browser sent the presigned fields and the file; S3 answers 204.
     await route.fulfill({ status: 204 });
+  });
+
+  // On the context: the document opens in a new tab, which page routes do not cover.
+  await page.context().route('**/mock-document.pdf*', (route) => {
+    api.openedDocuments.push(new URL(route.request().url()).searchParams.get('doc') ?? '');
+    return route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF' });
   });
 
   await page.route('**/mock.pdf', (route) =>
@@ -141,10 +177,16 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
         years,
         persons: api.persons.map((p) => {
           const list = saved(year).filter((c) => c.personId === p.personId);
+          const totals = list.map((c) => toApi(c).reimbursement);
+          const sum = (pick: (t: (typeof totals)[number]) => number) =>
+            totals.reduce((acc, t) => acc + pick(t), 0);
           return {
             ...p,
             count: list.length,
-            totalAmount: list.reduce((sum, c) => sum + (c.amount ?? 0), 0),
+            totalAmount: list.reduce((acc, c) => acc + (c.amount ?? 0), 0),
+            reimbursedAmount: sum((t) => t.reimbursed),
+            outstandingAmount: sum((t) => t.outstanding),
+            selfBorneAmount: sum((t) => t.selfBorne),
           };
         }),
       });
@@ -156,7 +198,7 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
       const claims = saved(year)
         .filter((c) => c.personId === personClaims[1])
         .sort((a, b) => (b.invoiceDate ?? '').localeCompare(a.invoiceDate ?? ''));
-      return json(route, { claims });
+      return json(route, { claims: claims.map(toApi) });
     }
 
     if (method === 'POST' && path === '/uploads') {
@@ -175,6 +217,9 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
         hasPdf: true,
         extractionStatus: 'PENDING',
         extraction: null,
+        submittedAt: null,
+        paidAt: null,
+        entries: [],
         createdAt: now,
         updatedAt: now,
       };
@@ -182,7 +227,7 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
       return json(
         route,
         {
-          claim,
+          claim: toApi(claim),
           upload: {
             url: 'http://localhost:4300/mock-s3',
             fields: { key: `uploads/u/${claim.claimId}.pdf` },
@@ -208,11 +253,95 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
         hasPdf: false,
         extractionStatus: null,
         extraction: null,
+        submittedAt: body.submittedAt ?? null,
+        paidAt: body.paidAt ?? null,
+        entries: [],
         createdAt: now,
         updatedAt: now,
       };
       api.claims.push(claim);
-      return json(route, claim, 201);
+      return json(route, toApi(claim), 201);
+    }
+
+    // ------------------------------------------------------------ reimbursement
+    const sub = /^\/claims\/([^/]+)\/(documents|entries)(?:\/([^/]+))?(\/url)?$/.exec(path);
+    if (sub) {
+      const owner = api.claims.find((c) => c.claimId === sub[1]);
+      if (!owner) return json(route, { error: { code: 'not_found' } }, 404);
+      const [, , kind, itemId, isUrl] = sub;
+
+      if (method === 'POST' && kind === 'documents' && !itemId) {
+        const uploadId = newId();
+        api.stagedUploads.set(uploadId, owner.claimId);
+        return json(
+          route,
+          {
+            uploadId,
+            upload: {
+              url: 'http://localhost:4300/mock-s3',
+              fields: {
+                key: `incoming/u/${owner.claimId}/${uploadId}`,
+                'Content-Type': body.contentType,
+              },
+            },
+          },
+          201,
+        );
+      }
+
+      if (method === 'POST' && kind === 'entries' && !itemId) {
+        const parsed = createEntryRequestSchema.safeParse(body);
+        if (!parsed.success) return json(route, { error: { code: 'validation_failed' } }, 400);
+        const entry = parsed.data;
+        const amounts = {
+          reimbursedAmount: entry.reimbursedAmount ?? null,
+          rejectedAmount: entry.rejectedAmount ?? null,
+        };
+        if (checkNewEntry(owner.amount ?? 0, owner.entries, amounts)) {
+          return json(route, { error: { code: 'amount_above_invoice' } }, 400);
+        }
+        if (entry.documents.some((d) => api.stagedUploads.get(d.uploadId) !== owner.claimId)) {
+          return json(route, { error: { code: 'upload_missing' } }, 400);
+        }
+        owner.entries.push({
+          entryId: newId(),
+          status: entry.status,
+          date: entry.date,
+          ...amounts,
+          note: entry.note,
+          documents: entry.documents.map((d) => ({
+            documentId: d.uploadId,
+            fileName: d.fileName,
+            contentType: 'application/pdf',
+            size: 1000,
+            uploadedAt: now,
+          })),
+          createdAt: new Date().toISOString(),
+        });
+        return json(route, toApi(owner), 201);
+      }
+
+      if (method === 'DELETE' && kind === 'entries' && itemId) {
+        owner.entries = owner.entries.filter((e) => e.entryId !== itemId);
+        return json(route, toApi(owner));
+      }
+
+      if (kind === 'documents' && itemId) {
+        const has = owner.entries.some((e) => e.documents.some((d) => d.documentId === itemId));
+        if (!has) return json(route, { error: { code: 'document_not_found' } }, 404);
+        if (method === 'GET' && isUrl) {
+          return json(route, {
+            url: `http://localhost:4300/mock-document.pdf?doc=${itemId}`,
+            expiresIn: 60,
+          });
+        }
+        if (method === 'DELETE' && !isUrl) {
+          for (const e of owner.entries)
+            e.documents = e.documents.filter((d) => d.documentId !== itemId);
+          return json(route, toApi(owner));
+        }
+      }
+      return json(route, { error: { code: 'not_found' } }, 404);
     }
 
     const single = /^\/claims\/([^/]+)$/.exec(path);
@@ -239,7 +368,7 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
         }
       }
       return json(route, {
-        ...claim,
+        ...toApi(claim),
         pdfUrl: claim.hasPdf ? 'http://localhost:4300/mock.pdf' : null,
       });
     }
@@ -254,8 +383,10 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
         amount: body.amount,
         description: body.description,
         extractionStatus: claim.extractionStatus === 'PENDING' ? 'FAILED' : claim.extractionStatus,
+        ...(body.submittedAt !== undefined ? { submittedAt: body.submittedAt } : {}),
+        ...(body.paidAt !== undefined ? { paidAt: body.paidAt } : {}),
       });
-      return json(route, claim);
+      return json(route, toApi(claim));
     }
 
     if (method === 'DELETE' && claim) {

@@ -1,6 +1,6 @@
 import { AnalyzeExpenseCommand, type TextractClient } from '@aws-sdk/client-textract';
 import type { ExtractionResult, InvoiceExtractor } from './extractor';
-import { mapExpenseDocument } from './mapper';
+import { mapExpenseDocuments } from './mapper';
 
 /**
  * Synchronous AnalyzeExpense. It reads single-page PDFs only: multi-page or otherwise
@@ -14,6 +14,6 @@ export class TextractInvoiceExtractor implements InvoiceExtractor {
       new AnalyzeExpenseCommand({ Document: { Bytes: pdf } }),
     );
     // Only the mapped fields leave this function, the raw response is dropped here.
-    return mapExpenseDocument(response.ExpenseDocuments?.[0]);
+    return mapExpenseDocuments(response.ExpenseDocuments);
   }
 }

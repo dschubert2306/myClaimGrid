@@ -71,6 +71,10 @@ export const claimFieldsSchema = z.strictObject({
   invoiceDate: isoDateSchema,
   amount: amountCentsSchema,
   description: z.string().trim().max(500).optional().default(''),
+  /** Submitted to the insurer on this date: set means submitted. Null clears it, absent keeps it. */
+  submittedAt: isoDateSchema.nullable().optional(),
+  /** The user paid the invoice on this date, independent of the reimbursement. Null clears it. */
+  paidAt: isoDateSchema.nullable().optional(),
 });
 export type ClaimFields = z.infer<typeof claimFieldsSchema>;
 export type ClaimFieldsInput = z.input<typeof claimFieldsSchema>;
@@ -99,6 +103,137 @@ export const extractionSchema = z.strictObject({
 });
 export type Extraction = z.infer<typeof extractionSchema>;
 
+// ---------------------------------------------------------- reimbursement
+
+/**
+ * How far the insurer is with the reimbursement. Independent of `paidAt` (the user paid the
+ * invoice) and of `ClaimStatus` (draft or saved record).
+ */
+export const reimbursementStatusSchema = z.enum(['OPEN', 'IN_PROGRESS', 'PARTLY_PAID', 'PAID']);
+export type ReimbursementStatus = z.infer<typeof reimbursementStatusSchema>;
+
+/** Statuses whose history entry carries a reimbursed amount (and optionally a rejected one). */
+export const PAYMENT_STATUSES: readonly ReimbursementStatus[] = ['PARTLY_PAID', 'PAID'];
+export const isPaymentStatus = (status: ReimbursementStatus): boolean =>
+  PAYMENT_STATUSES.includes(status);
+
+/** Integer cents, zero or more. */
+export const nonNegativeCentsSchema = z.number().int().min(0).max(100_000_000_00);
+
+/** Letters from the insurer: mostly PDF, sometimes a photo or scan. */
+export const DOCUMENT_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
+export const documentContentTypeSchema = z.enum(DOCUMENT_CONTENT_TYPES);
+export type DocumentContentType = z.infer<typeof documentContentTypeSchema>;
+export const MAX_DOCUMENTS_PER_ENTRY = 10;
+export const MAX_ENTRIES_PER_CLAIM = 50;
+
+/** Display name of an uploaded file. Path separators and control characters are replaced. */
+export const fileNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  // eslint-disable-next-line no-control-regex -- removing control characters is the point
+  .transform((name) => name.replace(/[\u0000-\u001f\u007f/\\]/g, '_'));
+
+export const insurerDocumentSchema = z.strictObject({
+  documentId: idSchema,
+  fileName: z.string(),
+  contentType: documentContentTypeSchema,
+  size: z.number().int(),
+  uploadedAt: z.string(),
+});
+export type InsurerDocument = z.infer<typeof insurerDocumentSchema>;
+
+export const reimbursementEntrySchema = z.strictObject({
+  entryId: idSchema,
+  status: reimbursementStatusSchema,
+  /** Date of the event (for example the date on the benefit statement). */
+  date: isoDateSchema,
+  /** Cents paid out with this entry. Only for PAID and PARTLY_PAID, entries add up. */
+  reimbursedAmount: z.number().int().nullable(),
+  /** Cents the insurer rejected or kept as deductible with this entry. */
+  rejectedAmount: z.number().int().nullable(),
+  note: z.string(),
+  documents: z.array(insurerDocumentSchema),
+  createdAt: z.string(),
+});
+export type ReimbursementEntry = z.infer<typeof reimbursementEntrySchema>;
+
+/** Derived from the history. Amounts in cents, they split the invoice amount without overlap. */
+export const reimbursementSchema = z.strictObject({
+  /** Status of the most recent entry, OPEN without entries. */
+  status: reimbursementStatusSchema,
+  /** Oldest first. */
+  entries: z.array(reimbursementEntrySchema),
+  /** Sum of all reimbursed amounts. */
+  reimbursed: z.number().int(),
+  /** Sum of all rejected amounts and deductibles. */
+  rejected: z.number().int(),
+  /** Still expected from the insurer. Zero once the status is PAID. */
+  outstanding: z.number().int(),
+  /** Finally borne by the user: rejected amounts, plus the rest once the status is PAID. */
+  selfBorne: z.number().int(),
+});
+export type Reimbursement = z.infer<typeof reimbursementSchema>;
+
+export const createDocumentUploadRequestSchema = z.strictObject({
+  contentType: documentContentTypeSchema,
+  size: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
+});
+export type CreateDocumentUploadRequest = z.infer<typeof createDocumentUploadRequestSchema>;
+
+/** Presigned POST into the staging area. The file becomes part of the claim with the entry. */
+export const createDocumentUploadResponseSchema = z.strictObject({
+  uploadId: idSchema,
+  upload: z.strictObject({
+    url: z.string(),
+    fields: z.record(z.string(), z.string()),
+  }),
+});
+export type CreateDocumentUploadResponse = z.infer<typeof createDocumentUploadResponseSchema>;
+
+export const createEntryRequestSchema = z
+  .strictObject({
+    status: reimbursementStatusSchema,
+    date: isoDateSchema,
+    reimbursedAmount: nonNegativeCentsSchema.optional(),
+    rejectedAmount: nonNegativeCentsSchema.optional(),
+    note: z.string().trim().max(500).optional().default(''),
+    documents: z
+      .array(z.strictObject({ uploadId: idSchema, fileName: fileNameSchema }))
+      .max(MAX_DOCUMENTS_PER_ENTRY)
+      .optional()
+      .default([]),
+  })
+  .superRefine((entry, ctx) => {
+    const pays = isPaymentStatus(entry.status);
+    if (pays && entry.reimbursedAmount === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reimbursedAmount'], message: 'Required' });
+    }
+    if (!pays && entry.reimbursedAmount !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reimbursedAmount'], message: 'Not allowed' });
+    }
+    if (!pays && entry.rejectedAmount !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['rejectedAmount'], message: 'Not allowed' });
+    }
+    const ids = entry.documents.map((d) => d.uploadId);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', path: ['documents'], message: 'Duplicate upload' });
+    }
+  });
+export type CreateEntryRequest = z.infer<typeof createEntryRequestSchema>;
+export type CreateEntryRequestInput = z.input<typeof createEntryRequestSchema>;
+
+/** Short-lived presigned GET for one insurer document. */
+export const documentUrlResponseSchema = z.strictObject({
+  url: z.string(),
+  expiresIn: z.number().int(),
+});
+export type DocumentUrlResponse = z.infer<typeof documentUrlResponseSchema>;
+
+// ----------------------------------------------------------------- claim
+
 export const claimSchema = z.strictObject({
   claimId: idSchema,
   personId: idSchema,
@@ -114,6 +249,9 @@ export const claimSchema = z.strictObject({
   hasPdf: z.boolean(),
   extractionStatus: extractionStatusSchema.nullable(),
   extraction: extractionSchema.nullable(),
+  submittedAt: isoDateSchema.nullable(),
+  paidAt: isoDateSchema.nullable(),
+  reimbursement: reimbursementSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -153,6 +291,9 @@ export const dashboardPersonSchema = z.strictObject({
   color: personColorSchema,
   count: z.number().int(),
   totalAmount: z.number().int(),
+  reimbursedAmount: z.number().int(),
+  outstandingAmount: z.number().int(),
+  selfBorneAmount: z.number().int(),
 });
 
 export const dashboardResponseSchema = z.strictObject({

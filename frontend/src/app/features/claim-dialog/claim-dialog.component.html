@@ -133,15 +133,14 @@
           <div class="mcg-dialog__split">
             <div><ng-container *ngTemplateOutlet="formFields" /></div>
             <div class="mcg-dialog__pdf">
-              <object
+              <!-- An iframe, not an object: Angular creates the element before it binds the URL, and
+                   Chrome blocks an <object> that starts without data under the CSP, for good. -->
+              <iframe
                 class="app-pdf"
-                type="application/pdf"
                 data-testid="pdf-preview"
-                [data]="pdfUrl()"
-                [attr.aria-label]="'dialog.pdfPreview' | transloco"
-              >
-                <p class="mcg-muted">{{ 'dialog.pdfFallback' | transloco }}</p>
-              </object>
+                [src]="pdfUrl()"
+                [attr.title]="'dialog.pdfPreview' | transloco"
+              ></iframe>
             </div>
           </div>
         } @else {
@@ -309,5 +308,45 @@
         [attr.aria-describedby]="describedBy('description')"
       ></textarea>
     </mcg-field>
+
+    <!-- Submission and self-payment: two independent dates, saved with the claim. -->
+    <fieldset class="app-fieldset">
+      <legend class="app-section-title">{{ 'tracking.title' | transloco }}</legend>
+      <div class="mcg-fields-2">
+        <mcg-field
+          [label]="'tracking.submittedAt' | transloco"
+          inputId="f-submittedAt"
+          [hint]="'tracking.submittedHint' | transloco"
+          [error]="errorText('submittedAt')"
+        >
+          <mcg-date-input
+            inputId="f-submittedAt"
+            formControlName="submittedAt"
+            [invalid]="!!errorText('submittedAt')"
+            [describedBy]="describedBy('submittedAt')"
+            (blurred)="normalize('submittedAt')"
+          />
+        </mcg-field>
+        <mcg-field
+          [label]="'tracking.paidAt' | transloco"
+          inputId="f-paidAt"
+          [hint]="'tracking.paidHint' | transloco"
+          [error]="errorText('paidAt')"
+        >
+          <mcg-date-input
+            inputId="f-paidAt"
+            formControlName="paidAt"
+            [invalid]="!!errorText('paidAt')"
+            [describedBy]="describedBy('paidAt')"
+            (blurred)="normalize('paidAt')"
+          />
+        </mcg-field>
+      </div>
+    </fieldset>
   </form>
+
+  <!-- Outside the claim form: the entry dialog has a form of its own. -->
+  @if (showReimbursement()) {
+    <mcg-reimbursement-section [claim]="claim()!" (changed)="onHistoryChanged($event)" />
+  }
 </ng-template>

@@ -67,7 +67,12 @@
     "newClaim": "New claim",
     "loading": "Loading data",
     "loadError": "The data could not be loaded.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "views": {
+      "label": "View",
+      "overview": "Overview",
+      "list": "List"
+    }
   },
   "empty": {
     "title": "No claims for {{year}} yet",
@@ -83,14 +88,23 @@
     "noClaims": "No claims for {{year}} yet.",
     "renameError": "The name could not be saved.",
     "deductibleOpen": "Selbstbehalt: {{remaining}} left of {{amount}}",
-    "deductibleReached": "Selbstbehalt of {{amount}} reached"
+    "deductibleReached": "Selbstbehalt of {{amount}} reached",
+    "reimbursed": "Reimbursed",
+    "outstanding": "Outstanding",
+    "selfBorne": "Borne by you"
   },
   "table": {
     "date": "Date",
     "provider": "Doctor or hospital",
     "invoiceNumber": "Invoice no.",
     "amount": "Amount",
-    "status": "Status"
+    "status": "Status",
+    "person": "Person",
+    "reimbursement": "Reimbursement",
+    "payment": "Paid by you",
+    "reimbursed": "Reimbursed",
+    "outstanding": "Outstanding",
+    "total": "Total"
   },
   "status": {
     "DRAFT": "Draft",
@@ -125,7 +139,13 @@
     "uploadFailed": "The upload did not work. Please try again.",
     "saveFailed": "The claim could not be saved. Please try again.",
     "deleteFailed": "The claim could not be deleted. Please try again.",
-    "loadClaimFailed": "The claim could not be loaded."
+    "loadClaimFailed": "The claim could not be loaded.",
+    "cents": "Please enter an amount of 0 or more.",
+    "aboveInvoice": "Reimbursed and rejected together may not exceed the invoice amount.",
+    "amountBelowReimbursed": "The amount is lower than what was already reimbursed or rejected.",
+    "documentType": "Please choose a PDF, JPG or PNG file.",
+    "invalidDocument": "A file is not a valid PDF, JPG or PNG.",
+    "conflict": "The claim was changed in the meantime. Please close it and open it again."
   },
   "dialog": {
     "newTitle": "New claim",
@@ -163,7 +183,6 @@
     "loading": "Loading the claim",
     "extractionFailed": "The invoice could not be read. Please enter the data yourself.",
     "pdfPreview": "PDF preview",
-    "pdfFallback": "This browser cannot show the preview.",
     "removeFile": "Remove file",
     "dropTitle": "Drag a PDF here or choose a file",
     "dropOver": "Release to add",
@@ -202,5 +221,86 @@
       "12h": "12 hours",
       "preview": "Preview"
     }
+  },
+  "reimbursement": {
+    "status": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In progress",
+      "PARTLY_PAID": "Partly reimbursed",
+      "PAID": "Reimbursed"
+    },
+    "notSubmitted": "not submitted",
+    "submittedOn": "submitted on {{date}}",
+    "payment": {
+      "paid": "Paid",
+      "unpaid": "Not paid",
+      "paidOn": "Paid on {{date}}"
+    },
+    "section": "Reimbursement",
+    "current": "Current state",
+    "invoiceAmount": "Invoice amount",
+    "reimbursed": "Reimbursed",
+    "rejected": "Rejected or deductible",
+    "outstanding": "Outstanding",
+    "selfBorne": "Borne by you",
+    "difference": "Difference to the invoice amount",
+    "history": "History",
+    "empty": "No entries yet. Add one as soon as the insurer responds.",
+    "immediate": "Entries and documents are saved right away.",
+    "add": "Add entry",
+    "entryReimbursed": "Reimbursed {{amount}}",
+    "entryRejected": "Rejected {{amount}}",
+    "deleteEntry": "Delete entry",
+    "confirmDeleteEntry": "The entry and its documents will be deleted. This cannot be undone.",
+    "openDocument": "Open {{name}}",
+    "deleteDocument": "Delete {{name}}",
+    "confirmDeleteDocument": "The document {{name}} will be deleted. This cannot be undone.",
+    "documentFailed": "The document could not be opened. Please try again.",
+    "deleteFailed": "This could not be deleted. Please try again.",
+    "needsSave": "Save the claim first, then you can track its reimbursement."
+  },
+  "tracking": {
+    "title": "Submission and payment",
+    "submittedAt": "Submitted on",
+    "submittedHint": "Leave empty while the claim has not been submitted.",
+    "paidAt": "Invoice paid on",
+    "paidHint": "When you paid the invoice yourself. Leave empty while it is unpaid."
+  },
+  "entry": {
+    "title": "Add entry",
+    "status": "Status",
+    "date": "Date of the entry",
+    "reimbursedAmount": "Reimbursed amount",
+    "reimbursedHint": "Only the amount of this payment. Several partial reimbursements add up.",
+    "rejectedAmount": "Rejected or deductible",
+    "rejectedHint": "Optional, amount of this statement.",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "documents": "Documents",
+    "dropTitle": "Drag a benefit statement or letter here or choose files",
+    "dropMeta": "PDF, JPG or PNG, 10 MB each at most",
+    "removeFile": "Remove {{name}}",
+    "preview": "Reimbursed afterwards: {{reimbursed}} of {{amount}}. Difference: {{difference}}",
+    "save": "Save entry",
+    "uploading": "Uploading documents",
+    "saving": "Saving the entry",
+    "saveFailed": "The entry could not be saved. Please try again.",
+    "tooManyFiles": "At most 10 documents per entry."
+  },
+  "list": {
+    "person": "Person",
+    "allPersons": "All persons",
+    "reimbursementFilter": "Reimbursement",
+    "paymentFilter": "Paid by you",
+    "filterAll": "All",
+    "notSubmitted": "Not submitted",
+    "notReimbursed": "Not reimbursed yet",
+    "paid": "Paid",
+    "unpaid": "Not paid",
+    "preset": "Paid, but not reimbursed yet",
+    "reset": "Reset filters",
+    "count": "{{count}} of {{total}} claims",
+    "empty": "No claim matches the filters.",
+    "noClaims": "No claims for {{year}} yet."
   }
 }

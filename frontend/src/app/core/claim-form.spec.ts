@@ -18,6 +18,8 @@ const valid = {
   invoiceDate: '12.03.2026',
   amount: '1.234,56',
   description: '',
+  submittedAt: '',
+  paidAt: '',
 };
 
 const claim = (overrides: Partial<Claim> = {}): Claim => ({
@@ -35,6 +37,16 @@ const claim = (overrides: Partial<Claim> = {}): Claim => ({
   hasPdf: true,
   extractionStatus: 'DONE',
   extraction: { confidence: { provider: 98, invoiceDate: 97, amount: 93 } },
+  submittedAt: null,
+  paidAt: null,
+  reimbursement: {
+    status: 'OPEN',
+    entries: [],
+    reimbursed: 0,
+    rejected: 0,
+    outstanding: 8940,
+    selfBorne: 0,
+  },
   createdAt: '2026-03-12T10:00:00.000Z',
   updatedAt: '2026-03-12T10:00:00.000Z',
   ...overrides,
@@ -73,8 +85,20 @@ describe('toClaimFields', () => {
         invoiceDate: '2026-03-12',
         amount: 123456,
         description: '',
+        submittedAt: null,
+        paidAt: null,
       },
     });
+  });
+
+  it('keeps submission and payment date optional and validates them when filled', () => {
+    expect(validateField('submittedAt', '', DE)).toBeNull();
+    expect(validateField('paidAt', '31.02.2026', DE)).toBe('date');
+    const result = toClaimFields({ ...valid, submittedAt: '14.03.2026', paidAt: '2026-03-20' }, DE);
+    expect(result.ok && [result.fields.submittedAt, result.fields.paidAt]).toEqual([
+      '2026-03-14',
+      '2026-03-20',
+    ]);
   });
 
   it('reports every invalid field at once and never sends the form', () => {
@@ -88,10 +112,18 @@ describe('toClaimFields', () => {
     });
   });
 
-  it('has no bank data field, the API shape is exactly five fields', () => {
+  it('has no bank data field, the API shape is exactly the seven claim fields', () => {
     const result = toClaimFields(valid, DE);
     expect(result.ok && Object.keys(result.fields).sort()).toEqual(
-      ['amount', 'description', 'invoiceDate', 'invoiceNumber', 'provider'].sort(),
+      [
+        'amount',
+        'description',
+        'invoiceDate',
+        'invoiceNumber',
+        'provider',
+        'submittedAt',
+        'paidAt',
+      ].sort(),
     );
   });
 });
@@ -104,8 +136,11 @@ describe('fromClaim and fieldMarkers', () => {
       invoiceDate: '12.03.2026',
       amount: '89,40',
       description: '',
+      submittedAt: '',
+      paidAt: '',
     });
     expect(fromClaim(claim(), EN).invoiceDate).toBe('12/03/2026');
+    expect(fromClaim(claim({ paidAt: '2026-03-20' }), DE).paidAt).toBe('20.03.2026');
   });
 
   it('tags extracted fields and marks the others as not recognised after a finished extraction', () => {

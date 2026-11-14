@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatFileSize, validatePdf } from './file-validation';
+import {
+  documentContentType,
+  formatFileSize,
+  validateDocument,
+  validatePdf,
+} from './file-validation';
 
 const file = (name: string, type: string, size: number) => ({ name, type, size });
 
@@ -29,5 +34,22 @@ describe('formatFileSize', () => {
     expect(formatFileSize(1, 'de-DE')).toBe('1 KB');
     expect(formatFileSize(2_621_440, 'de-DE')).toBe('2,5 MB');
     expect(formatFileSize(2_621_440, 'en-GB')).toBe('2.5 MB');
+  });
+});
+
+describe('validateDocument and documentContentType', () => {
+  it('accepts PDF, JPEG and PNG up to 10 MB', () => {
+    expect(validateDocument(file('Leistungsabrechnung.pdf', 'application/pdf', 1000))).toBeNull();
+    expect(validateDocument(file('Brief.JPG', 'image/jpeg', 1000))).toBeNull();
+    expect(validateDocument(file('scan.png', '', 1000))).toBeNull();
+    expect(documentContentType(file('foto.jpeg', '', 1))).toBe('image/jpeg');
+  });
+
+  it('rejects other types, mismatching names and sizes', () => {
+    expect(validateDocument(file('brief.docx', 'application/msword', 1000))).toBe('type');
+    expect(validateDocument(file('brief.pdf', 'image/png', 1000))).toBe('type');
+    expect(validateDocument(file('seite.html', 'text/html', 1000))).toBe('type');
+    expect(validateDocument(file('a.pdf', 'application/pdf', 0))).toBe('size');
+    expect(validateDocument(file('a.pdf', 'application/pdf', 10 * 1024 * 1024 + 1))).toBe('size');
   });
 });

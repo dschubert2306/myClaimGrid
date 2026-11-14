@@ -9,7 +9,7 @@ import type { Formats } from './date-format';
 import { parseAmountInput, parseDateInput } from './parse-input';
 
 /**
- * Logic of the five claim fields, free of Angular so it can be tested directly.
+ * Logic of the claim fields (five invoice fields plus submission and payment date), free of Angular so it can be tested directly.
  * The form holds what the user sees (text in the active language), the API gets ISO dates and cents.
  */
 
@@ -19,6 +19,8 @@ export const CLAIM_FIELD_NAMES = [
   'invoiceDate',
   'amount',
   'description',
+  'submittedAt',
+  'paidAt',
 ] as const;
 export type ClaimFieldName = (typeof CLAIM_FIELD_NAMES)[number];
 export type ClaimFormValues = Record<ClaimFieldName, string>;
@@ -30,6 +32,8 @@ const MAX_LENGTH: Record<ClaimFieldName, number> = {
   invoiceDate: 20,
   amount: 20,
   description: 500,
+  submittedAt: 20,
+  paidAt: 20,
 };
 
 export const EMPTY_CLAIM_FORM: ClaimFormValues = {
@@ -38,6 +42,8 @@ export const EMPTY_CLAIM_FORM: ClaimFormValues = {
   invoiceDate: '',
   amount: '',
   description: '',
+  submittedAt: '',
+  paidAt: '',
 };
 
 export function validateField(
@@ -56,6 +62,11 @@ export function validateField(
     case 'amount':
       if (value === '') return 'required';
       return parseAmountInput(value, formats.locale) === null ? 'amount' : null;
+    case 'submittedAt':
+    case 'paidAt':
+      // Optional: empty means not submitted or not paid.
+      if (value === '') return null;
+      return parseDateInput(value, formats.dateFormat) === null ? 'date' : null;
     default:
       return null;
   }
@@ -80,11 +91,17 @@ export function toClaimFields(values: ClaimFormValues, formats: Formats): ClaimF
     invoiceDate: parseDateInput(values.invoiceDate, formats.dateFormat),
     amount: parseAmountInput(values.amount, formats.locale),
     description: values.description.trim(),
+    submittedAt: optionalDate(values.submittedAt, formats),
+    paidAt: optionalDate(values.paidAt, formats),
   };
   // Final guard with the same schema the API uses.
   const parsed = claimFieldsSchema.safeParse(candidate);
   if (!parsed.success) return { ok: false, errors: { provider: 'required' } };
   return { ok: true, fields: parsed.data };
+}
+
+function optionalDate(value: string, formats: Formats): string | null {
+  return value.trim() === '' ? null : parseDateInput(value, formats.dateFormat);
 }
 
 /** Claim from the API -> text shown in the form. Missing values stay empty, nothing is guessed. */
@@ -95,6 +112,8 @@ export function fromClaim(claim: Claim, formats: Formats): ClaimFormValues {
     invoiceDate: claim.invoiceDate ? formatInvoiceDate(claim.invoiceDate, formats.dateFormat) : '',
     amount: claim.amount !== null ? formatAmountPlain(claim.amount, formats.locale) : '',
     description: claim.description ?? '',
+    submittedAt: claim.submittedAt ? formatInvoiceDate(claim.submittedAt, formats.dateFormat) : '',
+    paidAt: claim.paidAt ? formatInvoiceDate(claim.paidAt, formats.dateFormat) : '',
   };
 }
 

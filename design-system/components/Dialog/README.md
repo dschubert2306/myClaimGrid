@@ -6,7 +6,7 @@ Markup: `.mcg-scrim` (CDK overlay backdrop) holding `.mcg-dialog` with `role="di
 
 - Steps for upload mode: "Person und Art" / "Person and type", "Auslesen" / "Reading", "Daten prüfen" / "Review data". Manual mode skips the middle step and the PDF pane, the dialog stays narrow (`mcg-dialog--narrow`).
 - Step 1 uses `.mcg-choice` for the mode ("PDF hochladen" / "Manuell erfassen"), the person Select, and the Dropzone.
-- Review step: form left, PDF in `.mcg-dialog__pdf` right on `surface-sunken`. Embed the presigned GET URL in an `<object type="application/pdf">` or the browser viewer. Below 900px the preview moves under the form.
+- Review step: form left, PDF in `.mcg-dialog__pdf` right on `surface-sunken`. Embed the presigned GET URL in an `<iframe>` (the browser viewer). Not an `<object>`: a framework creates the element before it binds the URL, and Chrome blocks an `<object>` that starts without data under the CSP for good. Below 900px the preview moves under the form.
 - Footer: Back left, Cancel and the primary action right. Cancel, Escape and the close button all delete the draft and its file, so ask once if the user has edited fields.
 - Focus trap via `cdkTrapFocus`, first field focused on open, focus returns to "Neue Rechnung" on close. Body scroll locked.
 - Opening an existing claim from the table reuses the review step with "Rechnung bearbeiten" as title and "Löschen" as a danger button in the footer left.

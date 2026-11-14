@@ -7,7 +7,7 @@ import { isoDateSchema } from '@myclaimgrid/shared';
 
 /** "1.234,56 €", "EUR 1,234.56", "12,5", "1234.56" -> integer cents. Returns null for zero, negatives and unclear input. */
 export function parseAmountToCents(input: string): number | null {
-  const text = input.replace(/[\s\u00a0\u202f]/g, '').replace(/EUR|€/gi, '');
+  const text = input.replace(/[\s\u00a0\u202f]/g, '').replace(/EURO?|€/gi, '');
   if (!/^[0-9.,]+$/.test(text)) return null; // also rejects "-12,00" and "(12,00)"
   if (!/\d/.test(text)) return null;
 
@@ -39,6 +39,31 @@ export function parseAmountToCents(input: string): number | null {
 
   const cents = Number(integerPart || '0') * 100 + Number(fractionPart.padEnd(2, '0') || '0');
   return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
+}
+
+/**
+ * Finds the amount in a value that carries extra text, as OCR output often does:
+ * "Summe: 123,45 €", "123,45 €*", "119,00 € inkl. 19 % MwSt.". Percentages are ignored.
+ * Takes the only amount in the text, or else the only one with two decimals.
+ * Returns null when it stays ambiguous or the amount is negative ("-12,00", "(12,00)", "12,00-").
+ */
+export function findAmountInText(input: string): number | null {
+  const strict = parseAmountToCents(input);
+  if (strict !== null) return strict;
+
+  const text = input.replace(/\d+(?:[.,]\d+)?\s*%/g, ' ');
+  const found: { cents: number; twoDecimals: boolean }[] = [];
+  for (const match of text.matchAll(/\d[\d.,]*/g)) {
+    const token = match[0].replace(/[.,]+$/, '');
+    const before = text.slice(0, match.index).trimEnd();
+    const after = text.slice(match.index + match[0].length).replace(/^\s*(?:EURO?|€)/i, '');
+    if (/[-(−]$/.test(before) || /^\s*[-−)]/.test(after)) return null;
+    const cents = parseAmountToCents(token);
+    if (cents !== null) found.push({ cents, twoDecimals: /[.,]\d{2}$/.test(token) });
+  }
+  if (found.length === 1) return found[0]!.cents;
+  const withDecimals = found.filter((f) => f.twoDecimals);
+  return withDecimals.length === 1 ? withDecimals[0]!.cents : null;
 }
 
 const MONTHS: Record<string, number> = {

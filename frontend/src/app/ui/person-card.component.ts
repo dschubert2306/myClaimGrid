@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import type { Claim, Person } from '@myclaimgrid/shared';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DashboardStore } from '../core/dashboard.store';
+import { DashboardStore, type PersonFigures } from '../core/dashboard.store';
 import { McgCurrencyPipe } from '../core/pipes';
 import { ButtonComponent } from './button.component';
 import { ClaimTableComponent } from './claim-table.component';
@@ -70,6 +70,20 @@ import { ProgressComponent } from './progress.component';
         <div class="mcg-person__count">{{ count() }}</div>
       </div>
     </div>
+    <dl class="app-figures" [attr.aria-label]="'reimbursement.section' | transloco">
+      <div>
+        <dt class="mcg-label">{{ 'person.outstanding' | transloco }}</dt>
+        <dd data-testid="figure-outstanding">{{ figures().outstandingAmount | mcgCurrency }}</dd>
+      </div>
+      <div>
+        <dt class="mcg-label">{{ 'person.reimbursed' | transloco }}</dt>
+        <dd data-testid="figure-reimbursed">{{ figures().reimbursedAmount | mcgCurrency }}</dd>
+      </div>
+      <div>
+        <dt class="mcg-label">{{ 'person.selfBorne' | transloco }}</dt>
+        <dd data-testid="figure-self-borne">{{ figures().selfBorneAmount | mcgCurrency }}</dd>
+      </div>
+    </dl>
     @if (person().deductible > 0) {
       <div class="app-deductible">
         <mcg-progress
@@ -109,8 +123,9 @@ export class PersonCardComponent {
 
   readonly person = input.required<Person>();
   readonly year = input.required<number>();
-  readonly total = input.required<number>();
-  readonly count = input.required<number>();
+  readonly figures = input.required<PersonFigures>();
+  protected readonly total = computed(() => this.figures().totalAmount);
+  protected readonly count = computed(() => this.figures().count);
   readonly claims = input.required<Claim[]>();
   readonly selectedId = input<string | null>(null);
   readonly openClaim = output<string>();

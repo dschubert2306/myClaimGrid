@@ -67,7 +67,12 @@
     "newClaim": "Neue Rechnung",
     "loading": "Daten werden geladen",
     "loadError": "Die Daten konnten nicht geladen werden.",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "views": {
+      "label": "Ansicht",
+      "overview": "Übersicht",
+      "list": "Liste"
+    }
   },
   "empty": {
     "title": "Noch keine Rechnungen für {{year}}",
@@ -83,14 +88,23 @@
     "noClaims": "Für {{year}} noch keine Rechnungen.",
     "renameError": "Der Name konnte nicht gespeichert werden.",
     "deductibleOpen": "Selbstbehalt: noch {{remaining}} von {{amount}}",
-    "deductibleReached": "Selbstbehalt von {{amount}} erreicht"
+    "deductibleReached": "Selbstbehalt von {{amount}} erreicht",
+    "reimbursed": "Erstattet",
+    "outstanding": "Ausstehend",
+    "selfBorne": "Selbst getragen"
   },
   "table": {
     "date": "Datum",
     "provider": "Arzt oder Klinik",
     "invoiceNumber": "Rechnungsnr.",
     "amount": "Betrag",
-    "status": "Status"
+    "status": "Status",
+    "person": "Person",
+    "reimbursement": "Erstattung",
+    "payment": "Selbst bezahlt",
+    "reimbursed": "Erstattet",
+    "outstanding": "Ausstehend",
+    "total": "Summe"
   },
   "status": {
     "DRAFT": "Entwurf",
@@ -125,7 +139,13 @@
     "uploadFailed": "Das Hochladen hat nicht geklappt. Bitte versuche es erneut.",
     "saveFailed": "Die Rechnung konnte nicht gespeichert werden. Bitte versuche es erneut.",
     "deleteFailed": "Die Rechnung konnte nicht gelöscht werden. Bitte versuche es erneut.",
-    "loadClaimFailed": "Die Rechnung konnte nicht geladen werden."
+    "loadClaimFailed": "Die Rechnung konnte nicht geladen werden.",
+    "cents": "Bitte gib einen Betrag von 0 oder mehr ein.",
+    "aboveInvoice": "Erstattet und abgelehnt dürfen zusammen nicht über dem Rechnungsbetrag liegen.",
+    "amountBelowReimbursed": "Der Betrag ist kleiner als das, was schon erstattet oder abgelehnt wurde.",
+    "documentType": "Bitte wähle eine PDF-, JPG- oder PNG-Datei.",
+    "invalidDocument": "Eine Datei ist kein gültiges PDF, JPG oder PNG.",
+    "conflict": "Die Rechnung wurde inzwischen geändert. Bitte schließe sie und öffne sie erneut."
   },
   "dialog": {
     "newTitle": "Neue Rechnung",
@@ -163,7 +183,6 @@
     "loading": "Rechnung wird geladen",
     "extractionFailed": "Die Rechnung konnte nicht ausgelesen werden. Bitte trage die Daten selbst ein.",
     "pdfPreview": "PDF-Vorschau",
-    "pdfFallback": "Die Vorschau wird in diesem Browser nicht unterstützt.",
     "removeFile": "Datei entfernen",
     "dropTitle": "PDF hierher ziehen oder Datei auswählen",
     "dropOver": "Loslassen zum Hinzufügen",
@@ -202,5 +221,86 @@
       "12h": "12 Stunden",
       "preview": "Vorschau"
     }
+  },
+  "reimbursement": {
+    "status": {
+      "OPEN": "Offen",
+      "IN_PROGRESS": "In Bearbeitung",
+      "PARTLY_PAID": "Teilweise erstattet",
+      "PAID": "Erstattet"
+    },
+    "notSubmitted": "nicht eingereicht",
+    "submittedOn": "eingereicht am {{date}}",
+    "payment": {
+      "paid": "Bezahlt",
+      "unpaid": "Nicht bezahlt",
+      "paidOn": "Bezahlt am {{date}}"
+    },
+    "section": "Erstattung",
+    "current": "Aktueller Stand",
+    "invoiceAmount": "Rechnungsbetrag",
+    "reimbursed": "Erstattet",
+    "rejected": "Abgelehnt oder Selbstbehalt",
+    "outstanding": "Ausstehend",
+    "selfBorne": "Selbst getragen",
+    "difference": "Differenz zum Rechnungsbetrag",
+    "history": "Verlauf",
+    "empty": "Noch keine Einträge. Füge einen hinzu, sobald die Versicherung reagiert.",
+    "immediate": "Einträge und Dokumente werden sofort gespeichert.",
+    "add": "Eintrag hinzufügen",
+    "entryReimbursed": "Erstattet {{amount}}",
+    "entryRejected": "Abgelehnt {{amount}}",
+    "deleteEntry": "Eintrag löschen",
+    "confirmDeleteEntry": "Der Eintrag und seine Dokumente werden gelöscht. Das lässt sich nicht rückgängig machen.",
+    "openDocument": "{{name}} öffnen",
+    "deleteDocument": "{{name}} löschen",
+    "confirmDeleteDocument": "Das Dokument {{name}} wird gelöscht. Das lässt sich nicht rückgängig machen.",
+    "documentFailed": "Das Dokument konnte nicht geöffnet werden. Bitte versuche es erneut.",
+    "deleteFailed": "Das konnte nicht gelöscht werden. Bitte versuche es erneut.",
+    "needsSave": "Speichere die Rechnung zuerst, dann kannst du den Erstattungsverlauf pflegen."
+  },
+  "tracking": {
+    "title": "Einreichung und Zahlung",
+    "submittedAt": "Eingereicht am",
+    "submittedHint": "Leer, solange die Rechnung nicht eingereicht ist.",
+    "paidAt": "Rechnung bezahlt am",
+    "paidHint": "Wann du die Rechnung selbst bezahlt hast. Leer, solange sie offen ist."
+  },
+  "entry": {
+    "title": "Eintrag hinzufügen",
+    "status": "Status",
+    "date": "Datum des Eintrags",
+    "reimbursedAmount": "Erstatteter Betrag",
+    "reimbursedHint": "Nur der Betrag dieser Zahlung. Mehrere Teilerstattungen werden addiert.",
+    "rejectedAmount": "Abgelehnt oder Selbstbehalt",
+    "rejectedHint": "Optional, Betrag dieser Abrechnung.",
+    "note": "Notiz",
+    "notePlaceholder": "Optional",
+    "documents": "Dokumente",
+    "dropTitle": "Leistungsabrechnung oder Brief hierher ziehen oder Dateien auswählen",
+    "dropMeta": "PDF, JPG oder PNG, je höchstens 10 MB",
+    "removeFile": "{{name}} entfernen",
+    "preview": "Danach erstattet: {{reimbursed}} von {{amount}}. Differenz: {{difference}}",
+    "save": "Eintrag speichern",
+    "uploading": "Dokumente werden hochgeladen",
+    "saving": "Eintrag wird gespeichert",
+    "saveFailed": "Der Eintrag konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "tooManyFiles": "Höchstens 10 Dokumente pro Eintrag."
+  },
+  "list": {
+    "person": "Person",
+    "allPersons": "Alle Personen",
+    "reimbursementFilter": "Erstattung",
+    "paymentFilter": "Selbst bezahlt",
+    "filterAll": "Alle",
+    "notSubmitted": "Nicht eingereicht",
+    "notReimbursed": "Noch nicht erstattet",
+    "paid": "Bezahlt",
+    "unpaid": "Nicht bezahlt",
+    "preset": "Bezahlt, aber noch nicht erstattet",
+    "reset": "Filter zurücksetzen",
+    "count": "{{count}} von {{total}} Rechnungen",
+    "empty": "Keine Rechnung passt zu den Filtern.",
+    "noClaims": "Noch keine Rechnungen für {{year}}."
   }
 }

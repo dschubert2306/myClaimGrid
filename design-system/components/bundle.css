@@ -75,6 +75,8 @@ textarea.mcg-input { height: auto; min-height: 72px; padding: var(--space-2) var
 .mcg-badge--pending { background: var(--warning-soft); color: var(--warning); }
 .mcg-badge--done { background: var(--accent-soft); color: var(--accent); }
 .mcg-badge--failed { background: var(--danger-soft); color: var(--danger); }
+.mcg-badge--partial { background: var(--accent-soft); color: var(--accent); }
+.mcg-badge--partial::before { border: var(--border-hairline) solid currentColor; background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
 
 /* Top bar */
 .mcg-topbar { display: flex; align-items: center; gap: var(--space-4); height: var(--topbar-height); padding: 0 var(--space-6); background: var(--surface); border-bottom: var(--border-hairline) solid var(--line); }

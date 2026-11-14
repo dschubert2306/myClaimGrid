@@ -1,5 +1,6 @@
 import { dashboardQuerySchema, dashboardResponseSchema } from '@myclaimgrid/shared';
 import { createHandler, ok, parseQuery } from '../lib/http';
+import { toReimbursement } from '../lib/items';
 import { listClaimYears, listClaims, listPersons } from '../lib/repo';
 
 export const handler = createHandler({
@@ -23,13 +24,21 @@ export const handler = createHandler({
       dashboardResponseSchema.parse({
         year,
         years,
-        persons: perPerson.map(({ person, claims }) => ({
-          personId: person.personId,
-          name: person.name,
-          color: person.color,
-          count: claims.length,
-          totalAmount: claims.reduce((sum, c) => sum + (c.amount ?? 0), 0),
-        })),
+        persons: perPerson.map(({ person, claims }) => {
+          const totals = claims.map(toReimbursement);
+          const sum = (pick: (t: (typeof totals)[number]) => number) =>
+            totals.reduce((acc, t) => acc + pick(t), 0);
+          return {
+            personId: person.personId,
+            name: person.name,
+            color: person.color,
+            count: claims.length,
+            totalAmount: claims.reduce((acc, c) => acc + (c.amount ?? 0), 0),
+            reimbursedAmount: sum((t) => t.reimbursed),
+            outstandingAmount: sum((t) => t.outstanding),
+            selfBorneAmount: sum((t) => t.selfBorne),
+          };
+        }),
       }),
     );
   },

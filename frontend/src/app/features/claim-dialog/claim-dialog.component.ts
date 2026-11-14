@@ -14,9 +14,10 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import type { ClaimDetail } from '@myclaimgrid/shared';
+import type { Claim, ClaimDetail } from '@myclaimgrid/shared';
 import { firstValueFrom, take, type Subscription } from 'rxjs';
 import { ApiClient } from '../../core/api.client';
 import {
@@ -43,6 +44,7 @@ import { ProgressComponent } from '../../ui/progress.component';
 import { SelectComponent } from '../../ui/select.component';
 import { StatusBadgeComponent } from '../../ui/status-badge.component';
 import { CLAIM_DIALOG_DATA, ClaimDialogRef } from './claim-dialog.tokens';
+import { ReimbursementSectionComponent } from './reimbursement-section.component';
 
 type Step = 'choose' | 'reading' | 'review';
 type Mode = 'upload' | 'manual';
@@ -71,6 +73,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
     ProgressComponent,
     SelectComponent,
     StatusBadgeComponent,
+    ReimbursementSectionComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './claim-dialog.component.html',
@@ -109,6 +112,8 @@ export class ClaimDialogComponent implements OnDestroy {
 
   /** Draft created by this dialog (upload mode). Cancelling deletes it, an existing claim is never deleted by cancel. */
   private draftId: string | null = null;
+  /** The history was changed (saved right away): the dashboard must reload even after Cancel. */
+  private historyChanged = false;
   private work?: Subscription;
   private closing = false;
 
@@ -140,6 +145,11 @@ export class ClaimDialogComponent implements OnDestroy {
   });
 
   protected readonly showPdf = computed(() => this.pdfUrl() !== null);
+  /** The reimbursement section needs a saved claim with an invoice amount. */
+  protected readonly showReimbursement = computed(() => {
+    const claim = this.claim();
+    return this.isEdit && claim !== null && claim.status === 'OPEN' && claim.amount !== null;
+  });
   /** Entry step and manual mode are narrow (560px), the review with a PDF is wide. */
   protected readonly narrow = computed(() => this.step() !== 'review' || !this.showPdf());
   protected readonly title = computed(() => (this.isEdit ? 'dialog.editTitle' : 'dialog.newTitle'));
@@ -305,8 +315,14 @@ export class ClaimDialogComponent implements OnDestroy {
     return this.errorText(name) ? `f-${name}-error` : null;
   }
 
+  /** Entries and documents are saved by the section itself, the dialog keeps the PDF link. */
+  protected onHistoryChanged(updated: Claim): void {
+    this.historyChanged = true;
+    this.claim.update((current) => (current ? { ...current, ...updated } : current));
+  }
+
   /** Shows what was typed in the format of the language once the field is left. */
-  protected normalize(name: 'invoiceDate' | 'amount'): void {
+  protected normalize(name: 'invoiceDate' | 'amount' | 'submittedAt' | 'paidAt'): void {
     const control = this.form.controls[name];
     const { locale, dateFormat } = this.preferences.formats();
     if (name === 'amount') {
@@ -341,8 +357,11 @@ export class ClaimDialogComponent implements OnDestroy {
       }
       this.draftId = null; // saved, nothing left to discard
       this.finish('saved');
-    } catch {
-      this.error.set('errors.saveFailed');
+    } catch (error) {
+      const code = error instanceof HttpErrorResponse ? error.error?.error?.code : undefined;
+      this.error.set(
+        code === 'amount_below_reimbursed' ? 'errors.amountBelowReimbursed' : 'errors.saveFailed',
+      );
       this.saving.set(false);
     }
   }
@@ -384,7 +403,7 @@ export class ClaimDialogComponent implements OnDestroy {
     this.closing = true;
     this.work?.unsubscribe();
     await this.deleteDraft();
-    this.ref.close('cancelled');
+    this.ref.close(this.historyChanged ? 'saved' : 'cancelled');
   }
 
   private async deleteDraft(): Promise<void> {

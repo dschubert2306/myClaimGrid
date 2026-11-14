@@ -5,6 +5,14 @@ import { ApiClient } from './api.client';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+export interface PersonFigures {
+  count: number;
+  totalAmount: number;
+  reimbursedAmount: number;
+  outstandingAmount: number;
+  selfBorneAmount: number;
+}
+
 /** Data of the dashboard for the selected year: persons, totals and the claims per person. */
 @Injectable({ providedIn: 'root' })
 export class DashboardStore {
@@ -27,10 +35,25 @@ export class DashboardStore {
   /** False only when the whole account has no claim in any year. */
   readonly hasAnyClaims = computed(() => (this.dashboard()?.years.length ?? 0) > 0);
 
-  figures(personId: string): { count: number; totalAmount: number } {
+  figures(personId: string): PersonFigures {
     const entry = this.dashboard()?.persons.find((p) => p.personId === personId);
-    return { count: entry?.count ?? 0, totalAmount: entry?.totalAmount ?? 0 };
+    return {
+      count: entry?.count ?? 0,
+      totalAmount: entry?.totalAmount ?? 0,
+      reimbursedAmount: entry?.reimbursedAmount ?? 0,
+      outstandingAmount: entry?.outstandingAmount ?? 0,
+      selfBorneAmount: entry?.selfBorneAmount ?? 0,
+    };
   }
+
+  /** Every claim of the year with its person, newest invoice first (the list view). */
+  readonly allClaims = computed(() => {
+    const persons = this.persons();
+    const claims = this.claims();
+    return persons
+      .flatMap((person) => (claims[person.personId] ?? []).map((claim) => ({ claim, person })))
+      .sort((a, b) => (b.claim.invoiceDate ?? '').localeCompare(a.claim.invoiceDate ?? ''));
+  });
 
   setYear(year: number): Promise<void> {
     this.year.set(year);

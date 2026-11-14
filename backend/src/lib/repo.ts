@@ -10,7 +10,7 @@ import {
 import type { ClaimFields, PersonColor } from '@myclaimgrid/shared';
 import { ddb } from './aws';
 import { GSI_BY_CLAIM_ID, config } from './config';
-import { type ClaimItem, type PersonItem, yearOf } from './items';
+import { type ClaimItem, type EntryItem, type PersonItem, yearOf } from './items';
 import {
   ALL_YEARS_RANGE,
   claimGsiKey,
@@ -28,6 +28,16 @@ export function deterministicUuid(seed: string): string {
   const hex = createHash('sha256').update(seed).digest('hex');
   const variant = ((parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * A timestamp later than `previous`, even within the same millisecond. `updatedAt` doubles as the
+ * version for optimistic locking, so every write must change it.
+ */
+export function nextTimestamp(previous: string): string {
+  const now = Date.now();
+  const last = Date.parse(previous);
+  return new Date(Number.isNaN(last) ? now : Math.max(now, last + 1)).toISOString();
 }
 
 async function queryAll<T>(input: QueryCommandInput): Promise<T[]> {
@@ -147,10 +157,14 @@ export async function saveClaim(existing: ClaimItem, fields: ClaimFields): Promi
     invoiceDate: fields.invoiceDate,
     amount: fields.amount,
     description: fields.description,
+    // Absent in the request means "keep", null clears the date.
+    submittedAt:
+      fields.submittedAt === undefined ? (existing.submittedAt ?? null) : fields.submittedAt,
+    paidAt: fields.paidAt === undefined ? (existing.paidAt ?? null) : fields.paidAt,
     // Results that arrive after the user saved are discarded, so do not stay PENDING.
     extractionStatus:
       existing.extractionStatus === 'PENDING' ? 'FAILED' : existing.extractionStatus,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nextTimestamp(existing.updatedAt),
   };
 
   if (updated.sk === existing.sk) {
@@ -183,6 +197,27 @@ export async function saveClaim(existing: ClaimItem, fields: ClaimFields): Promi
       }),
     );
   }
+  return updated;
+}
+
+/**
+ * Replaces the reimbursement history. Optimistic locking on `updatedAt`: if the claim changed since
+ * it was read (another tab, a save that moved it to a new sort key), the write fails with a conflict.
+ */
+export async function saveEntries(existing: ClaimItem, entries: EntryItem[]): Promise<ClaimItem> {
+  const updated: ClaimItem = {
+    ...existing,
+    reimbursementEntries: entries,
+    updatedAt: nextTimestamp(existing.updatedAt),
+  };
+  await ddb.send(
+    new PutCommand({
+      TableName: config.tableName,
+      Item: updated,
+      ConditionExpression: 'attribute_exists(pk) AND updatedAt = :prev',
+      ExpressionAttributeValues: { ':prev': existing.updatedAt },
+    }),
+  );
   return updated;
 }
 

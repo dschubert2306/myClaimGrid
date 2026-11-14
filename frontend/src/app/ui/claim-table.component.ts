@@ -2,11 +2,17 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import type { Claim } from '@myclaimgrid/shared';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { McgCurrencyPipe, McgDatePipe } from '../core/pipes';
-import { StatusBadgeComponent } from './status-badge.component';
+import { PaymentBadgeComponent, ReimbursementBadgeComponent } from './tracking-badges.component';
 
 @Component({
   selector: 'mcg-claim-table',
-  imports: [TranslocoPipe, McgCurrencyPipe, McgDatePipe, StatusBadgeComponent],
+  imports: [
+    TranslocoPipe,
+    McgCurrencyPipe,
+    McgDatePipe,
+    PaymentBadgeComponent,
+    ReimbursementBadgeComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <table class="mcg-table">
@@ -34,7 +40,13 @@ import { StatusBadgeComponent } from './status-badge.component';
             <td class="mcg-table__provider">{{ claim.provider }}</td>
             <td class="mcg-table__invoice mcg-mono">{{ claim.invoiceNumber }}</td>
             <td class="mcg-table__amount">{{ claim.amount | mcgCurrency }}</td>
-            <td class="mcg-table__status"><mcg-status-badge [status]="claim.status" /></td>
+            <!-- Reimbursement and self-payment, the record status (always OPEN here) is not shown. -->
+            <td class="mcg-table__status">
+              <span class="app-badge-group">
+                <mcg-reimbursement-badge [status]="claim.reimbursement.status" />
+                <mcg-payment-badge [paidAt]="claim.paidAt" />
+              </span>
+            </td>
           </tr>
         }
       </tbody>

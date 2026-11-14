@@ -41,6 +41,14 @@ export class StorageStack extends cdk.Stack {
           expiredObjectDeleteMarker: true,
           abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
         },
+        {
+          id: 'expire-staged-insurer-documents',
+          // Uploads for a history entry wait here until the entry is saved, then they are moved.
+          // Whatever is left (dialog cancelled, tab closed) is gone after a day, old versions too.
+          prefix: 'incoming/',
+          expiration: cdk.Duration.days(1),
+          noncurrentVersionExpiration: cdk.Duration.days(1),
+        },
       ],
     });
 

@@ -11,8 +11,10 @@ import {
   createUploadRequestSchema,
   createUploadResponseSchema,
   listClaimsQuerySchema,
+  minimumInvoiceAmount,
   saveClaimRequestSchema,
 } from '@myclaimgrid/shared';
+import { ownedClaim } from '../lib/access';
 import { s3 } from '../lib/aws';
 import { PRESIGN_TTL_SECONDS, config } from '../lib/config';
 import {
@@ -29,21 +31,7 @@ import {
 import { type ClaimItem, toClaim, yearOf } from '../lib/items';
 import { claimGsiKey, datedSk, draftSk, personPk, uploadKey } from '../lib/keys';
 import { log } from '../lib/log';
-import {
-  createClaim,
-  deleteClaim,
-  getClaimById,
-  getPerson,
-  listClaims,
-  saveClaim,
-} from '../lib/repo';
-
-/** Every claim access goes through this check: the claim must belong to the signed-in user. */
-async function ownedClaim(req: Request): Promise<ClaimItem> {
-  const claim = await getClaimById(idParam(req, 'id'));
-  if (!claim || claim.userSub !== req.sub) throw new HttpError(404, 'not_found');
-  return claim;
-}
+import { createClaim, deleteClaim, getPerson, listClaims, saveClaim } from '../lib/repo';
 
 async function ownedPersonId(req: Request, personId: string): Promise<string> {
   const person = await getPerson(req.sub, personId);
@@ -121,6 +109,9 @@ export const handler = createHandler({
       amount: body.amount,
       currency: CURRENCY,
       description: body.description,
+      submittedAt: body.submittedAt ?? null,
+      paidAt: body.paidAt ?? null,
+      reimbursementEntries: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -149,6 +140,10 @@ export const handler = createHandler({
   'PUT /claims/{id}': async (req) => {
     const item = await ownedClaim(req);
     const fields = parseBody(req, saveClaimRequestSchema);
+    // The history must still fit into the invoice amount.
+    if (fields.amount < minimumInvoiceAmount(item.reimbursementEntries ?? [])) {
+      throw new HttpError(400, 'amount_below_reimbursed');
+    }
     const saved = await saveClaim(item, fields);
     log('info', 'claim saved', { claimId: saved.claimId });
     return ok(toClaim(saved));
@@ -157,8 +152,12 @@ export const handler = createHandler({
   'DELETE /claims/{id}': async (req) => {
     const item = await ownedClaim(req);
     // File first: a failed database delete can be retried, a leftover file would be forgotten.
-    if (item.s3Key) {
-      await s3.send(new DeleteObjectCommand({ Bucket: config.bucketName, Key: item.s3Key }));
+    const keys = [
+      ...(item.s3Key ? [item.s3Key] : []),
+      ...(item.reimbursementEntries ?? []).flatMap((e) => e.documents.map((d) => d.s3Key)),
+    ];
+    for (const key of keys) {
+      await s3.send(new DeleteObjectCommand({ Bucket: config.bucketName, Key: key }));
     }
     await deleteClaim(item);
     log('info', 'claim deleted', { claimId: item.claimId });

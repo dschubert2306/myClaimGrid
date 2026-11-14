@@ -32,3 +32,15 @@ export function parseUploadKey(
   if (!match) return null;
   return { sub: match[1] as string, claimId: match[2] as string, key };
 }
+
+/**
+ * Insurer documents live apart from the invoices. They are uploaded to a staging prefix that
+ * expires after a day (lifecycle rule) and move to the insurer prefix once an entry references them,
+ * so abandoned uploads never stay.
+ */
+export const STAGING_PREFIX = 'incoming/';
+export const INSURER_PREFIX = 'insurer/';
+export const stagedDocumentKey = (sub: string, claimId: string, uploadId: string) =>
+  `${STAGING_PREFIX}${sub}/${claimId}/${uploadId}`;
+export const insurerDocumentKey = (sub: string, claimId: string, documentId: string) =>
+  `${INSURER_PREFIX}${sub}/${claimId}/${documentId}`;

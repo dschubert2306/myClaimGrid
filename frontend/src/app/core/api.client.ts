@@ -4,9 +4,13 @@ import type {
   Claim,
   ClaimDetail,
   ClaimsResponse,
+  CreateDocumentUploadRequest,
+  CreateDocumentUploadResponse,
+  CreateEntryRequestInput,
   CreateManualClaimRequest,
   CreateUploadResponse,
   DashboardResponse,
+  DocumentUrlResponse,
   Person,
   PersonsResponse,
   RenamePersonRequest,
@@ -71,11 +75,51 @@ export class ApiClient {
     return this.url(`/claims/${claimId}`).pipe(switchMap((url) => this.http.delete<void>(url)));
   }
 
+  // ------------------------------------------------------------ reimbursement
+
+  /** Presigned POST for one insurer document, uploaded with `uploadToS3` before the entry is saved. */
+  createDocumentUpload(
+    claimId: string,
+    body: CreateDocumentUploadRequest,
+  ): Observable<CreateDocumentUploadResponse> {
+    return this.url(`/claims/${claimId}/documents`).pipe(
+      switchMap((url) => this.http.post<CreateDocumentUploadResponse>(url, body)),
+    );
+  }
+
+  addEntry(claimId: string, body: CreateEntryRequestInput): Observable<Claim> {
+    return this.url(`/claims/${claimId}/entries`).pipe(
+      switchMap((url) => this.http.post<Claim>(url, body)),
+    );
+  }
+
+  deleteEntry(claimId: string, entryId: string): Observable<Claim> {
+    return this.url(`/claims/${claimId}/entries/${entryId}`).pipe(
+      switchMap((url) => this.http.delete<Claim>(url)),
+    );
+  }
+
+  deleteDocument(claimId: string, documentId: string): Observable<Claim> {
+    return this.url(`/claims/${claimId}/documents/${documentId}`).pipe(
+      switchMap((url) => this.http.delete<Claim>(url)),
+    );
+  }
+
+  /** A fresh link that expires after a minute. Fetched on each click, never stored. */
+  documentUrl(claimId: string, documentId: string): Observable<DocumentUrlResponse> {
+    return this.url(`/claims/${claimId}/documents/${documentId}/url`).pipe(
+      switchMap((url) => this.http.get<DocumentUrlResponse>(url)),
+    );
+  }
+
   /**
    * Sends the PDF straight to S3 with the presigned POST. The file must be the last form field.
    * The auth interceptor only adds the token to the API, so no Authorization header reaches S3.
    */
-  uploadToS3(upload: CreateUploadResponse['upload'], file: File): Observable<UploadEvent> {
+  uploadToS3(
+    upload: { url: string; fields: Record<string, string> },
+    file: File,
+  ): Observable<UploadEvent> {
     const form = new FormData();
     for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
     form.append('file', file);

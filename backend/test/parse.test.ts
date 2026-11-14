@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAmountToCents, parseInvoiceDate } from '../src/lib/parse';
+import { findAmountInText, parseAmountToCents, parseInvoiceDate } from '../src/lib/parse';
 
 describe('parseAmountToCents', () => {
   it.each([
@@ -27,6 +27,31 @@ describe('parseAmountToCents', () => {
       expect(parseAmountToCents(input)).toBeNull();
     },
   );
+});
+
+describe('findAmountInText', () => {
+  it.each([
+    ['1.234,56 €', 123456],
+    ['Summe: 123,45 €', 12345],
+    ['123,45 €*', 12345],
+    ['EUR 89,90 (fällig sofort)', 8990],
+    ['119,00 € inkl. 19 % MwSt.', 11900],
+    ['3 Positionen 245,10 €', 24510],
+  ])('finds %j as %i cents', (input, cents) => {
+    expect(findAmountInText(input)).toBe(cents);
+  });
+
+  it.each([
+    '',
+    'keine Angabe',
+    '-12,00 €',
+    '(12,00)',
+    '12,00-',
+    '10,00 € oder 20,00 €',
+    '12.03.2026',
+  ])('does not guess for %j', (input) => {
+    expect(findAmountInText(input)).toBeNull();
+  });
 });
 
 describe('parseInvoiceDate', () => {

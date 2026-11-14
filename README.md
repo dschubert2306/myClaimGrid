@@ -1,6 +1,6 @@
 # myClaimGrid
 
-Web app to track health insurance claims for three persons. Release 1: create a claim from a PDF invoice (data is extracted, the user reviews and saves) or manually, and a dashboard per year and per person.
+Web app to track health insurance claims for three persons. Release 1: create a claim from a PDF invoice (data is extracted, the user reviews and saves) or manually, and a dashboard per year and per person. Release 3: reimbursement tracking, meaning submission date, reimbursement history with insurer documents, self-payment, a list view with filters, and the outstanding, reimbursed and self-borne amounts on the dashboard.
 
 Everything runs in `eu-central-1` (Frankfurt). The documents contain health data, nothing leaves the EU. No bank data (IBAN, BIC, account numbers) is ever extracted, stored, shown or logged.
 
@@ -103,9 +103,21 @@ Nothing below is run automatically. Use a dev or prod account of your choice.
 ## Architecture in short
 
 - **Stack order** (avoids circular references): `frontend` (bucket and CloudFront) -> `storage` -> `auth` -> `api` -> `frontend-deploy` and `ops`. The CloudFront domain is created first because S3 CORS and the Cognito callback URLs need it.
-- **API:** HTTP API with a Cognito JWT authorizer on every route. Four Lambdas (persons, claims, dashboard, extraction) with separate least-privilege roles. Logs are kept for 30 days.
+- **API:** HTTP API with a Cognito JWT authorizer on every route. Five Lambdas (persons, claims, dashboard, reimbursement, extraction) with separate least-privilege roles. Logs are kept for 30 days.
 - **Data:** one DynamoDB table (`pk`, `sk`) plus the index `byClaimId`. Persons live under `USER#<sub>`, claims under `PERSON#<id>`. Drafts use the sort key `CLAIM#DRAFT#<id>` and move to `CLAIM#<invoiceDate>#<id>` when saved. Amounts are integer cents.
 - **Upload:** `POST /uploads` creates a draft and returns a presigned POST (PDF only, 10 MB, enforced by S3). The S3 event on `uploads/*.pdf` triggers the extraction Lambda, which calls Textract `AnalyzeExpense`, maps five fields, and writes the result to the draft. The frontend polls `GET /claims/{id}`.
+- **Reimbursement:** a claim carries `submittedAt`, `paidAt` (both optional ISO dates, saved with `PUT /claims/{id}`) and `reimbursementEntries` (the history, embedded in the claim item, so it moves along when the invoice date changes the sort key). Status, reimbursed, rejected, outstanding and self-borne amounts are derived on every read from the history ([shared/src/reimbursement.ts](shared/src/reimbursement.ts)), nothing derived is stored. History writes use optimistic locking on `updatedAt` (409 on a concurrent change).
+- **Insurer documents:** `POST /claims/{id}/documents` returns a presigned POST to `incoming/<sub>/<claimId>/<uploadId>` (PDF, JPEG or PNG, 10 MB, type pinned by the policy). `POST /claims/{id}/entries` checks every referenced upload (type, size, leading bytes), copies it to `insurer/<sub>/<claimId>/<documentId>` and only then writes the entry. Whatever stays in `incoming/` expires after one day. Documents are opened through `GET /claims/{id}/documents/{documentId}/url`, a presigned GET valid for 60 seconds, fetched on each click. Deleting a document, an entry or the claim deletes the files.
+
+| Method | Route                                     | Lambda        |
+| ------ | ----------------------------------------- | ------------- |
+| POST   | `/claims/{id}/documents`                  | reimbursement |
+| POST   | `/claims/{id}/entries`                    | reimbursement |
+| DELETE | `/claims/{id}/entries/{entryId}`          | reimbursement |
+| DELETE | `/claims/{id}/documents/{documentId}`     | reimbursement |
+| GET    | `/claims/{id}/documents/{documentId}/url` | reimbursement |
+
+- **IAM for the documents:** the reimbursement Lambda may `PutObject`, `GetObject` and `DeleteObject` on `incoming/*` and `insurer/*` only, and has no access to the invoices under `uploads/`. The claims Lambda got exactly `DeleteObject` on `insurer/*` (deleting a claim deletes its documents). Template tests check both.
 - **Frontend:** Angular 22 (standalone components, signals, no zone.js), styles generated from `design-system/` (`npm run tokens`), texts in `de.json` and `en.json` (Transloco, switched at runtime), dates, numbers and currency formatted for `de-DE` or `en-GB`. `/login` sits outside the signed-in shell. Runtime settings come from `/config.json`, written by the CDK app at deploy time.
 - **Extractor:** behind the `InvoiceExtractor` interface in [backend/src/extraction/extractor.ts](backend/src/extraction/extractor.ts), so Textract can be replaced (for example by a model on Bedrock) without touching anything else.
 
@@ -121,7 +133,7 @@ These came up while building. Change them if you disagree.
 - **Dates:** `12.03.2026`, `12.3.26`, `2026-03-12`, `12/03/2026` (day first) and `12. März 2026`.
 - **Description** is never extracted. `AnalyzeExpense` has no reliable field for it.
 - **Textract** is called synchronously and reads single-page PDFs only. Multi-page or unreadable files end as `FAILED` and the user enters the data manually. The asynchronous API is a later upgrade.
-- **Bank data:** the extractor reads an allow list of five Textract types. Values that look like an IBAN are dropped even in an allowed field. Tests check that bank fields from the fixture never reach the database.
+- **Bank data:** the extractor reads an allow list: five normalized Textract types, plus values next to known printed labels (such as "Rechnungsnummer", "Referenz", "Rechnungsbetrag"), which German invoices need because Textract often leaves them unnormalized. Labels or lines that mention bank details, subtotals, tax or deductions are skipped. Values that look like an IBAN are dropped even in an allowed field. Tests check that bank fields from the fixture never reach the database.
 - **CSP:** the API, Cognito and S3 hosts are region wildcards (`*.execute-api.eu-central-1.amazonaws.com` and so on) because those hostnames do not exist when the distribution is created. Inline scripts are only allowed by hash (`infra/csp-script-hashes.json`, filled when the frontend exists). `style-src` allows `'unsafe-inline'` for Angular's runtime styles.
 - **Deleted invoices:** versioning stays on, deleting an invoice adds a delete marker and noncurrent versions expire after 30 days.
 - **Abandoned drafts** (browser closed during the dialog) keep their draft item and file. A cleanup job is a later task.
@@ -141,6 +153,21 @@ These came up while building. Change them if you disagree.
 - **Test data:** the repository contains no real invoices. The extraction fixture is a synthetic, anonymized Textract response ([backend/test/fixtures/](backend/test/fixtures/)).
 - **Toolchain:** TypeScript 6.0 (the version Angular 22 and typescript-eslint support), ESM everywhere, Vitest for shared, backend and the frontend logic, Playwright for the frontend flows, esbuild bundling through CDK.
 
+### Reimbursement tracking (release 3)
+
+- **Two dimensions, two fields.** Reimbursement status (`OPEN`, `IN_PROGRESS`, `PARTLY_PAID`, `PAID`) comes from the history. Self-payment is `paidAt`. Nothing combines them. The existing `status` (`DRAFT` / `OPEN`) stays what it was, the record lifecycle. It is no longer shown in the table, because drafts never appear there and its "Offen" would read like the reimbursement status.
+- **Words.** `PAID` / `PARTLY_PAID` show as "Erstattet" / "Teilweise erstattet" ("Reimbursed" / "Partly reimbursed"), self-payment as "Bezahlt" / "Nicht bezahlt" ("Paid" / "Not paid"). With "Bezahlt" on both, the two columns would read alike.
+- **Amounts.** Every `PAID` or `PARTLY_PAID` entry is one payment, so several partial reimbursements add up. The optional "rejected or deductible" amount adds up the same way. Reimbursed plus rejected may never exceed the invoice amount (checked on the server and in the dialog), and the invoice amount cannot be lowered below that sum afterwards (`amount_below_reimbursed`). Outstanding = invoice − reimbursed − rejected. `PAID` closes the claim: the rest is then self-borne, not outstanding. "Differenz zum Rechnungsbetrag" for `PARTLY_PAID` is invoice − reimbursed. Reimbursed and rejected amounts are only accepted on `PAID` and `PARTLY_PAID` entries.
+- **Current status** is the one of the entry with the latest date (same day: the one recorded last). A backdated entry does not change it.
+- **No "rejected" status** (not in the requirements). A full rejection is recorded as "Erstattet" with 0 € reimbursed and the invoice amount as rejected. Say if you want a separate status.
+- **Migration** happens on read: claims saved before release 3 have none of the new attributes and read as not submitted, not paid, `OPEN`, no history. Nothing is written to the table, every old attribute stays as it was (tested with a release-1 item). A backfill script is not needed. Write one only if a future index needs the attributes physically present.
+- **Submission** is the optional date "Eingereicht am" in the claim form. History entries are possible without it (the insurer may have received the claim some other way).
+- **Documents in the same bucket**, separated by prefix and IAM, so encryption, TLS only, versioning, CORS and retention are the same as for the invoices. A second bucket would duplicate all of that for no extra isolation (the same roles would need it). Deleted documents follow the existing 30 day rule for noncurrent versions.
+- **History changes are saved right away** (entry dialog, delete), independent of the claim form and its Save button. Closing the claim dialog afterwards still refreshes the dashboard.
+- **Not tested against real S3:** the copy from `incoming/` to `insurer/` (`CopyObject` within one bucket, no tags) and the `Range` read are unit tested against a mocked client only. Check one upload after the first deployment.
+- **Documents cannot be added to an existing entry.** Add a new entry instead, or say if you want it.
+- **The person's yearly Selbstbehalt** (settings) and the rejected or deductible amount of an entry are separate. The first is a planning figure compared with the invoice totals, the second is what the insurer actually kept.
+
 ## Design system gaps and deviations
 
 The design system is binding. These are the places where the app had to go beyond it or differ from it:
@@ -152,10 +179,12 @@ The design system is binding. These are the places where the app had to go beyon
 - **Theme switch** shows icons and labels on desktop and icons only below 640px, following the README text. The TopBar preview shows icons only.
 - **Type styles** (`title-1`, `figure`, and so on) exist as `.mcg-type-<name>` classes generated from `tokens.json`, because `bundle.css` has none.
 - **Top bar** has a Settings button between the theme switch and Sign out (the design system lists year, language, theme, sign out only). The settings page, the calendar popover and the Selbstbehalt bar are built from existing tokens and classes, they have no design-system preview yet.
+- **Reimbursement:** the StatusBadge has one new variant, `mcg-badge--partial` (accent colors, half filled outlined dot), added to `design-system/components/bundle.css` and documented in the StatusBadge README and preview together with the new status words. Everything else is built from existing tokens and classes without a preview: the overview/list switch (SegmentedControl) next to "Neue Rechnung", the filter bar and the full width list table (documented in the ClaimTable README), the three figures on the person card, the "Erstattung" section in the claim dialog, and the entry dialog, which is a second narrow `mcg-dialog` above the claim dialog with its own scrim, focus trap and Escape.
+- **Person cards are too narrow** for two status columns plus two amount columns (three columns from 1024px, about 390px each). The full table lives in the list view instead. The card table shows both badges in its status column when it has room, as before.
 
 ## Open points
 
 - Check the Textract quality on two or three real invoices before relying on it (German doctor invoices are often multi-page and itemized). If it is not good enough, replace the extractor.
 - Retention rules for stored invoices (current versions).
 - Git hosting: the pipeline assumes GitHub.
-- The status workflow after release 1 (submitted, reimbursed, rejected).
+- Reimbursement: whether a separate "rejected" status is wanted, and adding documents to an existing history entry (see the release 3 decisions).

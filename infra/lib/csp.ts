@@ -21,7 +21,7 @@ export function buildCsp(region: string, scriptHashes: string[]): string {
     `font-src 'self'`,
     `connect-src 'self' ${apiHost} ${cognitoIdp} ${cognitoHosted} ${s3Host}`,
     `frame-src ${s3Host}`,
-    `object-src ${s3Host}`,
+    `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
     `frame-ancestors 'none'`,
