@@ -29,24 +29,19 @@ test.describe('dashboard and claims', () => {
 
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('radio', { name: /PDF hochladen/ })).toBeFocused();
-
-    // Step 1: the person is required.
-    // The radio input is visually hidden by the design system, people click its label.
-    await dialog.locator('label', { hasText: 'Manuell erfassen' }).click();
-    await dialog.getByRole('button', { name: 'Weiter' }).click();
-    await expect(dialog.getByText('Bitte wähle eine Person aus.')).toBeVisible();
-    await dialog.getByLabel('Person').selectOption({ label: 'Jonas' });
-    await dialog.getByRole('button', { name: 'Weiter' }).click();
-
-    // Step 2: validation names what to enter, nothing is sent while invalid.
-    await expect(dialog.getByRole('button', { name: 'Zurück' })).toBeVisible();
+    // One dialog for everything: no steps, no mode to choose, one primary action.
+    await expect(dialog.getByLabel('Arzt oder Klinik')).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Weiter' })).toHaveCount(0);
     await expect(dialog.getByRole('img', { name: 'PDF-Vorschau' })).toHaveCount(0);
+
+    // Validation names what to enter, nothing is sent while invalid.
     await dialog.getByRole('button', { name: 'Speichern' }).click();
-    // Provider, date and amount are required: one sentence under each.
+    // The person, and provider, date and amount are required: one sentence under each.
+    await expect(dialog.getByText('Bitte wähle eine Person aus.')).toBeVisible();
     await expect(dialog.getByText('Bitte fülle dieses Feld aus.')).toHaveCount(3);
-    await dialog.getByLabel('Datum').fill('31.02.2026');
-    await dialog.getByLabel('Betrag').fill('0');
+    await dialog.getByLabel('Person').selectOption({ label: 'Jonas' });
+    await dialog.getByLabel('Datum', { exact: true }).fill('31.02.2026');
+    await dialog.getByLabel('Betrag', { exact: true }).fill('0');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(dialog.getByText('Bitte gib ein gültiges Datum ein.')).toBeVisible();
     await expect(dialog.getByText('Bitte gib einen Betrag größer als 0 ein.')).toBeVisible();
@@ -54,8 +49,8 @@ test.describe('dashboard and claims', () => {
 
     await dialog.getByLabel('Arzt oder Klinik').fill('Kinderarztpraxis Sonnenstraße');
     await dialog.getByLabel('Rechnungsnummer').fill('RE-2026-00417');
-    await dialog.getByLabel('Datum').fill('20.01.2026');
-    await dialog.getByLabel('Betrag').fill('1.234,56');
+    await dialog.getByLabel('Datum', { exact: true }).fill('20.01.2026');
+    await dialog.getByLabel('Betrag', { exact: true }).fill('1.234,56');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
 
     await expect(dialog).toHaveCount(0);
@@ -66,11 +61,16 @@ test.describe('dashboard and claims', () => {
       amount: 123456,
       source: 'MANUAL',
       status: 'OPEN',
+      paidAt: null,
+      submittedAt: null,
     });
+    expect(api.requests.filter((r) => r.startsWith('POST /claims'))).toEqual(['POST /claims']);
 
     // The dashboard refreshed: the claim is in Jonas' column, formatted in German.
     const jonas = page.locator('section.mcg-person', { hasText: 'Jonas' });
-    await expect(jonas.getByRole('row', { name: /Kinderarztpraxis Sonnenstraße/ })).toBeVisible();
+    await expect(
+      jonas.getByRole('button', { name: /Kinderarztpraxis Sonnenstraße/ }),
+    ).toBeVisible();
     await expect(jonas).toContainText('1.234,56');
     await expect(jonas).toContainText('20.01.2026');
     await expect(page.locator('section.mcg-person', { hasText: 'Anna' })).toContainText(
@@ -86,23 +86,24 @@ test.describe('dashboard and claims', () => {
     await page.getByRole('button', { name: 'Neue Rechnung' }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
 
-    await dialog.getByLabel('Person').selectOption({ label: 'Anna' });
-    await dialog.getByRole('button', { name: 'Hochladen' }).click();
-    await expect(dialog.getByText('Bitte wähle eine PDF-Datei aus.')).toBeVisible();
-
+    // The PDF is an option inside the same dialog. It needs a person first.
     await dialog.getByTestId('pdf-input').setInputFiles(PDF);
-    await expect(dialog.getByText(PDF.name)).toBeVisible();
-    await dialog.getByRole('button', { name: 'Hochladen' }).click();
+    await expect(dialog.getByText('Bitte wähle eine Person aus.')).toBeVisible();
+    await expect(dialog.getByText(PDF.name)).toHaveCount(0);
+    expect(api.claims).toHaveLength(0);
 
-    // Reading step, then the review step with the PDF next to the form.
+    await dialog.getByLabel('Person').selectOption({ label: 'Anna' });
+    await dialog.getByTestId('pdf-input').setInputFiles(PDF);
+
+    // Reading, then the PDF next to the same form, filled in.
     await expect(dialog.getByRole('progressbar')).toBeVisible();
     await expect(dialog.getByLabel('Arzt oder Klinik')).toHaveValue('Praxis Dr. Huber', {
       timeout: 15_000,
     });
     expect(api.uploadedFiles).toBe(1);
     await expect(dialog.getByTestId('pdf-preview')).toHaveAttribute('src', /mock\.pdf$/);
-    await expect(dialog.getByLabel('Datum')).toHaveValue('12.03.2026');
-    await expect(dialog.getByLabel('Betrag')).toHaveValue('89,40');
+    await expect(dialog.getByLabel('Datum', { exact: true })).toHaveValue('12.03.2026');
+    await expect(dialog.getByLabel('Betrag', { exact: true })).toHaveValue('89,40');
 
     // Extracted fields carry "Aus PDF", the empty one says "Nicht erkannt", nothing is guessed.
     await expect(dialog.locator('.mcg-tag--extracted')).toHaveCount(3);
@@ -111,7 +112,7 @@ test.describe('dashboard and claims', () => {
     await expect(dialog.getByLabel('Rechnungsnummer')).toHaveValue('');
 
     // Correcting a field removes its tag.
-    await dialog.getByLabel('Betrag').fill('89,45');
+    await dialog.getByLabel('Betrag', { exact: true }).fill('89,45');
     await expect(dialog.locator('.mcg-tag--extracted')).toHaveCount(2);
     await dialog.getByLabel('Rechnungsnummer').fill('RE-77');
     await expect(dialog.locator('.mcg-field--missing')).toHaveCount(0);
@@ -137,7 +138,6 @@ test.describe('dashboard and claims', () => {
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Person').selectOption({ label: 'Lea' });
     await dialog.getByTestId('pdf-input').setInputFiles(PDF);
-    await dialog.getByRole('button', { name: 'Hochladen' }).click();
 
     await expect(
       dialog.getByText(
@@ -171,7 +171,6 @@ test.describe('dashboard and claims', () => {
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Person').selectOption({ label: 'Anna' });
     await dialog.getByTestId('pdf-input').setInputFiles(PDF);
-    await dialog.getByRole('button', { name: 'Hochladen' }).click();
     await expect(dialog.getByLabel('Arzt oder Klinik')).toHaveValue('Praxis Dr. Huber', {
       timeout: 15_000,
     });
@@ -191,7 +190,7 @@ test.describe('dashboard and claims', () => {
     await expect(page.getByRole('button', { name: 'Neue Rechnung' }).first()).toBeFocused();
   });
 
-  test('an existing claim opens in the review step, can be changed and deleted after confirming', async ({
+  test('an existing claim opens in the same dialog, can be changed and deleted after confirming', async ({
     page,
   }) => {
     api = await mockBackend(page, [
@@ -203,24 +202,23 @@ test.describe('dashboard and claims', () => {
       },
     ]);
     await page.goto('/');
-    await page.getByRole('row', { name: /Zahnarztpraxis Berger/ }).click();
+    await page.getByRole('button', { name: /Zahnarztpraxis Berger/ }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Rechnung bearbeiten' });
     await expect(dialog.getByLabel('Arzt oder Klinik')).toHaveValue('Zahnarztpraxis Berger');
-    await expect(dialog.getByLabel('Betrag')).toHaveValue('103,00');
-    await expect(dialog.locator('.mcg-steps')).toHaveCount(0);
+    await expect(dialog.getByLabel('Betrag', { exact: true })).toHaveValue('103,00');
 
     // Cancelling an existing claim never deletes it.
     await dialog.getByRole('button', { name: 'Abbrechen' }).click();
     await expect(dialog).toHaveCount(0);
     expect(api.claims).toHaveLength(1);
 
-    await page.getByRole('row', { name: /Zahnarztpraxis Berger/ }).press('Enter');
-    await dialog.getByLabel('Betrag').fill('110');
+    await page.getByRole('button', { name: /Zahnarztpraxis Berger/ }).press('Enter');
+    await dialog.getByLabel('Betrag', { exact: true }).fill('110');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.locator('section.mcg-person', { hasText: 'Anna' })).toContainText('110,00');
 
-    await page.getByRole('row', { name: /Zahnarztpraxis Berger/ }).click();
+    await page.getByRole('button', { name: /Zahnarztpraxis Berger/ }).click();
     await dialog.getByRole('button', { name: 'Löschen', exact: true }).click();
     await expect(dialog.getByText(/werden gelöscht/)).toBeVisible();
     expect(api.claims).toHaveLength(1); // not yet
@@ -268,7 +266,7 @@ test.describe('dashboard and claims', () => {
       [String(new Date().getFullYear()), '2024'].sort((a, b) => Number(b) - Number(a)),
     );
     await select.selectOption('2024');
-    await expect(page.getByRole('row', { name: /Altpraxis/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Altpraxis/ })).toBeVisible();
   });
 });
 
@@ -283,9 +281,7 @@ test.describe('calendar', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Neue Rechnung' }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
-    await dialog.locator('label', { hasText: 'Manuell erfassen' }).click();
     await dialog.getByLabel('Person').selectOption({ label: 'Anna' });
-    await dialog.getByRole('button', { name: 'Weiter' }).click();
   });
 
   test('picks a date from the calendar and writes it in the date format', async ({ page }) => {

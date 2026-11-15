@@ -82,7 +82,7 @@ export function fakeDynamo() {
         checkCondition(
           entry.Delete.ConditionExpression,
           undefined,
-          undefined,
+          entry.Delete.ExpressionAttributeValues,
           store.get(k),
           'TransactionCanceledException',
         );

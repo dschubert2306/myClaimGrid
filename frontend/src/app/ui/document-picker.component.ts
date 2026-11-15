@@ -5,9 +5,10 @@ import {
   inject,
   input,
   model,
+  output,
   signal,
 } from '@angular/core';
-import { MAX_DOCUMENTS_PER_ENTRY } from '@myclaimgrid/shared';
+import { MAX_DOCUMENTS_PER_CLAIM, type InsurerDocument } from '@myclaimgrid/shared';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { formatFileSize, validateDocument } from '../core/file-validation';
 import { LanguageService } from '../core/language.service';
@@ -15,8 +16,10 @@ import { ButtonComponent } from './button.component';
 import { IconComponent } from './icon.component';
 
 /**
- * Several insurer documents (PDF, JPG, PNG) for one history entry: the Dropzone markup with a
- * file list above it. Only valid files reach `files`, problems are named below the drop area.
+ * The insurer documents of a claim (PDF, JPG, PNG) in one place: the ones already stored (open,
+ * remove), the ones chosen but not saved yet (remove), and the Dropzone markup to add more.
+ * Only valid files reach `files`, problems are named below the drop area. Nothing is uploaded or
+ * deleted here, the claim dialog does that with its one save.
  */
 @Component({
   selector: 'mcg-document-picker',
@@ -30,31 +33,57 @@ import { IconComponent } from './icon.component';
       (dragleave)="over.set(false)"
       (drop)="onDrop($event)"
     >
-      @for (chosen of files(); track $index) {
-        <div class="mcg-file">
+      @for (stored of existing(); track stored.documentId) {
+        <div class="mcg-file" data-testid="stored-document">
           <mcg-icon name="file" />
-          <span class="mcg-file__name">{{ chosen.name }}</span>
-          <span class="mcg-muted mcg-num" style="font-size: 13px">{{ size(chosen) }}</span>
+          <span class="mcg-file__name">
+            <button
+              type="button"
+              class="app-doc-link"
+              [attr.aria-label]="'documents.open' | transloco: { name: stored.fileName }"
+              (click)="openDocument.emit(stored)"
+            >
+              <span>{{ stored.fileName }}</span>
+            </button>
+          </span>
+          <span class="mcg-muted mcg-num" style="font-size: 13px">{{ sizeOf(stored.size) }}</span>
           <button
             mcg-button
             variant="ghost"
             [iconOnly]="true"
             [disabled]="disabled()"
-            [attr.aria-label]="'entry.removeFile' | transloco: { name: chosen.name }"
+            [attr.aria-label]="'documents.remove' | transloco: { name: stored.fileName }"
+            (click)="removeExisting.emit(stored)"
+          >
+            <mcg-icon name="close" />
+          </button>
+        </div>
+      }
+      @for (chosen of files(); track $index) {
+        <div class="mcg-file">
+          <mcg-icon name="file" />
+          <span class="mcg-file__name">{{ chosen.name }}</span>
+          <span class="mcg-muted mcg-num" style="font-size: 13px">{{ sizeOf(chosen.size) }}</span>
+          <button
+            mcg-button
+            variant="ghost"
+            [iconOnly]="true"
+            [disabled]="disabled()"
+            [attr.aria-label]="'documents.remove' | transloco: { name: chosen.name }"
             (click)="remove($index)"
           >
             <mcg-icon name="close" />
           </button>
         </div>
       }
-      @if (files().length < max) {
+      @if (count() < max) {
         <div
           class="mcg-drop app-drop--compact"
           [class.mcg-drop--over]="over()"
           [class.mcg-drop--error]="problems().length > 0"
           role="button"
           tabindex="0"
-          [attr.aria-label]="'entry.dropTitle' | transloco"
+          [attr.aria-label]="'documents.dropTitle' | transloco"
           [attr.aria-describedby]="problems().length > 0 ? 'documents-error' : null"
           (click)="picker.click()"
           (keydown.enter)="picker.click()"
@@ -62,9 +91,9 @@ import { IconComponent } from './icon.component';
         >
           <mcg-icon name="upload" />
           <div class="mcg-drop__title">
-            {{ (over() ? 'dialog.dropOver' : 'entry.dropTitle') | transloco }}
+            {{ (over() ? 'dialog.dropOver' : 'documents.dropTitle') | transloco }}
           </div>
-          <div class="mcg-drop__meta">{{ 'entry.dropMeta' | transloco }}</div>
+          <div class="mcg-drop__meta">{{ 'documents.dropMeta' | transloco }}</div>
           <input
             #picker
             type="file"
@@ -87,9 +116,15 @@ export class DocumentPickerComponent {
   private readonly i18n = inject(TranslocoService);
   private readonly language = inject(LanguageService);
 
+  /** Documents the claim has already, without the ones marked for removal. */
+  readonly existing = input<InsurerDocument[]>([]);
   readonly files = model<File[]>([]);
   readonly disabled = input(false);
-  protected readonly max = MAX_DOCUMENTS_PER_ENTRY;
+  readonly openDocument = output<InsurerDocument>();
+  readonly removeExisting = output<InsurerDocument>();
+
+  protected readonly max = MAX_DOCUMENTS_PER_CLAIM;
+  protected readonly count = computed(() => this.existing().length + this.files().length);
   protected readonly over = signal(false);
   protected readonly problems = signal<('type' | 'size' | 'count')[]>([]);
 
@@ -98,13 +133,15 @@ export class DocumentPickerComponent {
     const keys = {
       type: 'errors.documentType',
       size: 'errors.fileSize',
-      count: 'entry.tooManyFiles',
+      count: 'documents.tooMany',
     };
-    return [...new Set(this.problems())].map((p) => this.i18n.translate(keys[p])).join(' ');
+    return [...new Set(this.problems())]
+      .map((p) => this.i18n.translate(keys[p], { max: this.max }))
+      .join(' ');
   });
 
-  protected size(file: File): string {
-    return formatFileSize(file.size, this.language.locale());
+  protected sizeOf(bytes: number): string {
+    return formatFileSize(bytes, this.language.locale());
   }
 
   protected onPick(event: Event): void {
@@ -132,11 +169,15 @@ export class DocumentPickerComponent {
   private accept(candidates: File[]): void {
     const problems: ('type' | 'size' | 'count')[] = [];
     const next = [...this.files()];
+    let room = this.max - this.existing().length - next.length;
     for (const file of candidates) {
       const problem = validateDocument(file);
       if (problem) problems.push(problem);
-      else if (next.length >= this.max) problems.push('count');
-      else next.push(file);
+      else if (room <= 0) problems.push('count');
+      else {
+        next.push(file);
+        room -= 1;
+      }
     }
     this.problems.set(problems);
     this.files.set(next);

@@ -1,5 +1,6 @@
 import { A11yModule } from '@angular/cdk/a11y';
 import { NgTemplateOutlet } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -11,13 +12,18 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import type { Claim, ClaimDetail } from '@myclaimgrid/shared';
+import {
+  isPaymentStatus,
+  reimbursementStatusSchema,
+  type ClaimDetail,
+  type InsurerDocument,
+} from '@myclaimgrid/shared';
 import { firstValueFrom, take, type Subscription } from 'rxjs';
 import { ApiClient } from '../../core/api.client';
 import {
@@ -25,17 +31,26 @@ import {
   EMPTY_CLAIM_FORM,
   fieldMarkers,
   fromClaim,
-  toClaimFields,
-  validateField,
+  newestFirst,
+  paymentDateAfterToggle,
+  reimbursementDateFor,
+  reimbursementPreview,
+  showsReimbursementDetails,
+  suggestedReimbursement,
+  toClaimRequest,
   type ClaimFieldName,
+  type ClaimFormValues,
 } from '../../core/claim-form';
 import { DashboardStore } from '../../core/dashboard.store';
+import { documentContentType } from '../../core/file-validation';
 import { formatAmountPlain, formatInvoiceDate } from '../../core/format';
 import { LanguageService } from '../../core/language.service';
-import { PreferencesService } from '../../core/preferences.service';
+import { McgCurrencyPipe, McgDatePipe } from '../../core/pipes';
 import { parseAmountInput, parseDateInput } from '../../core/parse-input';
+import { PreferencesService } from '../../core/preferences.service';
 import { ButtonComponent } from '../../ui/button.component';
 import { DateInputComponent } from '../../ui/date-input.component';
+import { DocumentPickerComponent } from '../../ui/document-picker.component';
 import { DropzoneComponent } from '../../ui/dropzone.component';
 import { FieldComponent } from '../../ui/field.component';
 import { IconComponent } from '../../ui/icon.component';
@@ -43,19 +58,42 @@ import { NoticeComponent } from '../../ui/notice.component';
 import { ProgressComponent } from '../../ui/progress.component';
 import { SelectComponent } from '../../ui/select.component';
 import { StatusBadgeComponent } from '../../ui/status-badge.component';
+import { ReimbursementBadgeComponent } from '../../ui/tracking-badges.component';
 import { CLAIM_DIALOG_DATA, ClaimDialogRef } from './claim-dialog.tokens';
-import { ReimbursementSectionComponent } from './reimbursement-section.component';
 
-type Step = 'choose' | 'reading' | 'review';
-type Mode = 'upload' | 'manual';
+type FormControls = Record<ClaimFieldName, FormControl<string>> & { paid: FormControl<boolean> };
+type Busy = 'idle' | 'uploadingInvoice' | 'extracting' | 'uploadingDocuments' | 'saving';
 
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 60_000;
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** The fields an invoice PDF can fill. Fields the user has already filled in are left alone. */
+const EXTRACTED_FIELDS = [
+  'provider',
+  'invoiceNumber',
+  'invoiceDate',
+  'amount',
+  'description',
+] as const;
+
+/** API error codes of the save -> message keys. */
+const ERROR_KEYS: Record<string, string> = {
+  amount_above_invoice: 'errors.aboveInvoice',
+  date_required: 'errors.required',
+  date_before_latest: 'errors.dateBeforeLatest',
+  too_many_entries: 'errors.tooManyEntries',
+  too_many_documents: 'errors.tooManyDocuments',
+  invalid_document: 'errors.invalidDocument',
+  document_not_found: 'errors.conflict',
+  conflict: 'errors.conflict',
+};
+
 /**
- * The claim dialog: choose person and entry mode, upload and wait for the extraction, review and save.
- * The same review step edits an existing claim. Layout and states follow design-system/components/Dialog.
+ * The claim dialog: everything about one claim in one place, for a new claim and for an existing
+ * one. Invoice data (optionally read from a PDF), submission, reimbursement with its history,
+ * payment, and the insurer documents. One primary action saves it all in a single request.
+ * Layout and states follow design-system/components/Dialog.
  */
 @Component({
   selector: 'mcg-claim-dialog',
@@ -64,16 +102,19 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
     NgTemplateOutlet,
     ReactiveFormsModule,
     TranslocoPipe,
+    McgCurrencyPipe,
+    McgDatePipe,
     ButtonComponent,
     DateInputComponent,
+    DocumentPickerComponent,
     DropzoneComponent,
     FieldComponent,
     IconComponent,
     NoticeComponent,
     ProgressComponent,
+    ReimbursementBadgeComponent,
     SelectComponent,
     StatusBadgeComponent,
-    ReimbursementSectionComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './claim-dialog.component.html',
@@ -92,48 +133,45 @@ export class ClaimDialogComponent implements OnDestroy {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly isEdit = !!this.data.claimId;
-  protected readonly mode = signal<Mode>('upload');
-  protected readonly step = signal<Step>(this.isEdit ? 'review' : 'choose');
+  protected readonly statuses = reimbursementStatusSchema.options;
   protected readonly loadingExisting = signal(this.isEdit);
   protected readonly personId = signal<string | null>(null);
-  protected readonly file = signal<File | null>(null);
-  protected readonly chooseSubmitted = signal(false);
-  protected readonly phase = signal<'uploading' | 'extracting'>('uploading');
-  protected readonly uploadPercent = signal(0);
+  /** The saved claim being edited, or the draft that an invoice upload created for a new claim. */
   protected readonly claim = signal<ClaimDetail | null>(null);
   protected readonly pdfUrl = signal<SafeResourceUrl | null>(null);
   protected readonly extractionFailed = signal(false);
   protected readonly extractedFields = signal<ClaimFieldName[]>([]);
   protected readonly missingFields = signal<ClaimFieldName[]>([]);
+  protected readonly busy = signal<Busy>('idle');
+  protected readonly uploadPercent = signal(0);
   protected readonly error = signal<string | null>(null); // translation key
-  protected readonly saving = signal(false);
   protected readonly confirm = signal<'discard' | 'delete' | null>(null);
-  protected readonly formSubmitted = signal(false);
+  protected readonly submitted = signal(false);
+  protected readonly personMissing = signal(false);
+  private readonly invoiceDropzone = viewChild(DropzoneComponent);
+  /** Insurer documents chosen but not saved yet, and stored ones marked for removal. */
+  protected readonly files = signal<File[]>([]);
+  protected readonly removedIds = signal<string[]>([]);
 
-  /** Draft created by this dialog (upload mode). Cancelling deletes it, an existing claim is never deleted by cancel. */
+  /** Draft created by this dialog (invoice upload). Cancelling deletes it, a saved claim never. */
   private draftId: string | null = null;
-  /** The history was changed (saved right away): the dashboard must reload even after Cancel. */
-  private historyChanged = false;
   private work?: Subscription;
   private closing = false;
+  /** The form as it was when the claim was opened: what "changed" is measured against. */
+  private baseline: ClaimFormValues = EMPTY_CLAIM_FORM;
 
-  protected readonly form = new FormGroup(
-    Object.fromEntries(
-      CLAIM_FIELD_NAMES.map((name) => [
-        name,
-        new FormControl('', {
-          nonNullable: true,
-          validators: [
-            (control): ValidationErrors | null => {
-              const key = validateField(name, control.value, this.preferences.formats());
-              return key ? { [key]: true } : null;
-            },
-          ],
-        }),
-      ]),
-    ) as Record<ClaimFieldName, FormControl<string>>,
-  );
-  private readonly formEvents = toSignal(this.form.events);
+  protected readonly form = new FormGroup({
+    ...Object.fromEntries(
+      CLAIM_FIELD_NAMES.map((name) => [name, new FormControl('', { nonNullable: true })]),
+    ),
+    paid: new FormControl(false, { nonNullable: true }),
+  }) as unknown as FormGroup<FormControls>;
+  /** Bumped on every change of the form, so what is derived from it recomputes. */
+  private readonly revision = signal(0);
+  protected readonly values = computed(() => {
+    this.revision();
+    return this.form.getRawValue() as ClaimFormValues;
+  });
 
   protected readonly persons = this.store.persons;
   protected readonly personOptions = computed(() =>
@@ -144,38 +182,42 @@ export class ClaimDialogComponent implements OnDestroy {
     return this.persons().find((p) => p.personId === id)?.name ?? '';
   });
 
-  protected readonly showPdf = computed(() => this.pdfUrl() !== null);
-  /** The reimbursement section needs a saved claim with an invoice amount. */
-  protected readonly showReimbursement = computed(() => {
-    const claim = this.claim();
-    return this.isEdit && claim !== null && claim.status === 'OPEN' && claim.amount !== null;
+  private readonly entries = computed(() => this.claim()?.reimbursement.entries ?? []);
+  protected readonly history = computed(() => newestFirst(this.entries()));
+  protected readonly pays = computed(() => {
+    const status = reimbursementStatusSchema.safeParse(this.values().status);
+    return status.success && isPaymentStatus(status.data);
   });
-  /** Entry step and manual mode are narrow (560px), the review with a PDF is wide. */
-  protected readonly narrow = computed(() => this.step() !== 'review' || !this.showPdf());
-  protected readonly title = computed(() => (this.isEdit ? 'dialog.editTitle' : 'dialog.newTitle'));
-  protected readonly steps = computed(() =>
-    this.mode() === 'upload'
-      ? ['dialog.steps.type', 'dialog.steps.reading', 'dialog.steps.review']
-      : ['dialog.steps.type', 'dialog.steps.review'],
+  protected readonly details = computed(() =>
+    showsReimbursementDetails(this.values().status, this.entries()),
   );
-  protected readonly stepIndex = computed(() => {
-    const order: Step[] =
-      this.mode() === 'upload' ? ['choose', 'reading', 'review'] : ['choose', 'review'];
-    return order.indexOf(this.step());
-  });
-  protected readonly canGoBack = computed(
-    () => !this.isEdit && this.mode() === 'manual' && this.step() === 'review',
+  protected readonly preview = computed(() =>
+    reimbursementPreview(this.values(), this.language.locale()),
+  );
+  protected readonly result = computed(() =>
+    toClaimRequest(this.values(), this.preferences.formats(), this.entries()),
+  );
+  /** Stored documents without the ones that are removed once the claim is saved. */
+  protected readonly documents = computed(() =>
+    (this.claim()?.documents ?? []).filter((d) => !this.removedIds().includes(d.documentId)),
+  );
+
+  protected readonly showPdf = computed(() => this.pdfUrl() !== null);
+  protected readonly narrow = computed(() => !this.showPdf());
+  protected readonly title = computed(() => (this.isEdit ? 'dialog.editTitle' : 'dialog.newTitle'));
+  protected readonly working = computed(() => this.busy() !== 'idle');
+  protected readonly readingInvoice = computed(
+    () => this.busy() === 'uploadingInvoice' || this.busy() === 'extracting',
   );
   protected readonly personError = computed(() =>
-    this.chooseSubmitted() && !this.personId() ? this.i18n.translate('errors.person') : null,
-  );
-  protected readonly fileError = computed(() =>
-    this.chooseSubmitted() && this.mode() === 'upload' && !this.file()
-      ? this.i18n.translate('errors.file')
-      : null,
+    this.personMissing() && !this.personId() ? this.i18n.translate('errors.person') : null,
   );
 
   constructor() {
+    this.form.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.revision.update((n) => n + 1));
+    this.fill(EMPTY_CLAIM_FORM);
     this.focusFirst();
     if (this.data.claimId) void this.loadExisting(this.data.claimId);
   }
@@ -185,30 +227,19 @@ export class ClaimDialogComponent implements OnDestroy {
     this.work?.unsubscribe();
   }
 
-  // ------------------------------------------------------------ choose step
+  // ------------------------------------------------------------ invoice PDF
 
-  protected next(): void {
-    this.chooseSubmitted.set(true);
-    if (!this.personId()) return;
-    if (this.mode() === 'upload') {
-      if (this.file()) void this.startUpload();
+  /** The optional invoice PDF of a new claim: upload it, wait for the extraction, fill the form. */
+  protected async onInvoiceFile(file: File | null): Promise<void> {
+    if (!file || this.claim()) return;
+    const personId = this.personId();
+    if (!personId) {
+      // Nothing is uploaded without a person: ask for one, the file can be chosen again.
+      this.personMissing.set(true);
+      this.invoiceDropzone()?.clear();
       return;
     }
-    this.step.set('review');
-    this.focusFirst();
-  }
-
-  protected back(): void {
-    this.step.set('choose');
-    this.focusFirst();
-  }
-
-  private async startUpload(): Promise<void> {
-    const personId = this.personId();
-    const file = this.file();
-    if (!personId || !file) return;
-    this.step.set('reading');
-    this.phase.set('uploading');
+    this.busy.set('uploadingInvoice');
     this.uploadPercent.set(0);
     this.error.set(null);
     try {
@@ -221,11 +252,12 @@ export class ClaimDialogComponent implements OnDestroy {
           complete: resolve,
         });
       });
-      this.phase.set('extracting');
+      this.busy.set('extracting');
       this.showExtraction(await this.waitForExtraction(created.claim.claimId));
     } catch {
-      if (!this.closing) await this.failUpload();
+      if (!this.closing) await this.failInvoiceUpload();
     }
+    if (!this.closing) this.busy.set('idle');
   }
 
   /** Polls every 1.5 s for up to 60 s. A timeout is treated like a failed extraction. */
@@ -247,11 +279,9 @@ export class ClaimDialogComponent implements OnDestroy {
     return latest ?? (await firstValueFrom(this.api.claim(claimId)));
   }
 
-  private async failUpload(): Promise<void> {
+  private async failInvoiceUpload(): Promise<void> {
     await this.deleteDraft();
-    this.step.set('choose');
     this.error.set('errors.uploadFailed');
-    this.focusFirst();
   }
 
   private showExtraction(claim: ClaimDetail): void {
@@ -259,8 +289,15 @@ export class ClaimDialogComponent implements OnDestroy {
     this.claim.set(claim);
     this.setPdf(claim.pdfUrl);
     this.extractionFailed.set(failed);
-    this.fill(failed ? EMPTY_CLAIM_FORM : fromClaim(claim, this.preferences.formats()));
-    const markers = failed ? { extracted: [], missing: [] } : fieldMarkers(claim);
+    if (failed) return;
+
+    // Only empty fields are filled, so nothing the user typed while waiting is lost.
+    const extracted = fromClaim(claim, this.preferences.formats());
+    for (const name of EXTRACTED_FIELDS) {
+      const control = this.form.controls[name];
+      if (control.value.trim() === '' && extracted[name] !== '') control.setValue(extracted[name]);
+    }
+    const markers = fieldMarkers(claim);
     this.extractedFields.set(markers.extracted);
     this.missingFields.set(markers.missing);
     // The tags disappear as soon as the user edits the field.
@@ -272,8 +309,6 @@ export class ClaimDialogComponent implements OnDestroy {
           this.missingFields.update((list) => list.filter((n) => n !== name));
         });
     }
-    this.step.set('review');
-    this.focusFirst();
   }
 
   // ------------------------------------------------------------ existing claim
@@ -293,7 +328,7 @@ export class ClaimDialogComponent implements OnDestroy {
     }
   }
 
-  // ------------------------------------------------------------ review step
+  // ------------------------------------------------------------ the form
 
   protected tagFor(name: ClaimFieldName): 'extracted' | 'missing' | null {
     if (this.extractedFields().includes(name)) return 'extracted';
@@ -303,11 +338,11 @@ export class ClaimDialogComponent implements OnDestroy {
 
   /** Error text after blur or submit, one sentence that says what to enter. */
   protected errorText(name: ClaimFieldName): string | null {
-    this.formEvents(); // re-evaluated when the form changes
     this.language.lang();
     const control = this.form.controls[name];
-    if (!(control.touched || this.formSubmitted()) || !control.errors) return null;
-    const key = Object.keys(control.errors)[0];
+    const result = this.result();
+    if (result.ok || !(control.touched || this.submitted())) return null;
+    const key = result.errors[name];
     return key ? this.i18n.translate(`errors.${key}`) : null;
   }
 
@@ -315,14 +350,10 @@ export class ClaimDialogComponent implements OnDestroy {
     return this.errorText(name) ? `f-${name}-error` : null;
   }
 
-  /** Entries and documents are saved by the section itself, the dialog keeps the PDF link. */
-  protected onHistoryChanged(updated: Claim): void {
-    this.historyChanged = true;
-    this.claim.update((current) => (current ? { ...current, ...updated } : current));
-  }
-
   /** Shows what was typed in the format of the language once the field is left. */
-  protected normalize(name: 'invoiceDate' | 'amount' | 'submittedAt' | 'paidAt'): void {
+  protected normalize(
+    name: 'invoiceDate' | 'amount' | 'submittedAt' | 'reimbursementDate' | 'paidAt',
+  ): void {
     const control = this.form.controls[name];
     const { locale, dateFormat } = this.preferences.formats();
     if (name === 'amount') {
@@ -332,51 +363,163 @@ export class ClaimDialogComponent implements OnDestroy {
       const iso = parseDateInput(control.value, dateFormat);
       if (iso !== null) control.setValue(formatInvoiceDate(iso, dateFormat), { emitEvent: false });
     }
+    this.revision.update((n) => n + 1);
   }
 
+  /** The status was chosen by the user: the date and a final payment follow, unless edited. */
+  protected onStatusChanged(): void {
+    this.followReimbursement();
+    const control = this.form.controls.reimbursedAmount;
+    if (!control.pristine) return;
+    const status = this.form.controls.status.value;
+    // Back at the status it had: the amount it had, too.
+    const suggested =
+      status !== this.baseline.status
+        ? suggestedReimbursement(status, this.form.getRawValue(), this.preferences.formats().locale)
+        : null;
+    control.setValue(
+      suggested === null
+        ? this.baseline.reimbursedAmount
+        : formatAmountPlain(suggested, this.preferences.formats().locale),
+    );
+  }
+
+  /** The date of a change is today until the user picks one, see reimbursementDateFor. */
+  protected followReimbursement(): void {
+    const date = this.form.controls.reimbursementDate;
+    if (date.dirty) return;
+    const next = reimbursementDateFor(
+      this.form.getRawValue(),
+      this.baseline,
+      this.preferences.formats(),
+    );
+    if (next !== date.value) date.setValue(next);
+  }
+
+  /**
+   * The payment toggle was switched by the user. Switching on fills the current date, switching off
+   * clears it. Opening a saved claim never comes through here, so a saved date is never overwritten.
+   */
+  protected onPaidToggled(): void {
+    const { paid, paidAt } = this.form.controls;
+    paidAt.setValue(paymentDateAfterToggle(paid.value, paidAt.value, this.preferences.formats()));
+  }
+
+  // ------------------------------------------------------------ documents
+
+  protected removeStored(document: InsurerDocument): void {
+    this.form.markAsDirty();
+    this.removedIds.update((ids) => [...ids, document.documentId]);
+  }
+
+  /**
+   * Opens the document in a new tab with a link that is valid for a minute. The tab is opened
+   * inside the click (popup blockers), the signed URL is set once it arrives.
+   */
+  protected async openDocument(document: InsurerDocument): Promise<void> {
+    const claim = this.claim();
+    if (!claim) return;
+    this.error.set(null);
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    try {
+      const { url } = await firstValueFrom(
+        this.api.documentUrl(claim.claimId, document.documentId),
+      );
+      if (tab) tab.location.href = url;
+      else window.open(url, '_blank', 'noopener');
+    } catch {
+      tab?.close();
+      this.error.set('documents.openFailed');
+    }
+  }
+
+  /** Files go to S3 first, the claim is saved last and references them: no half saved claim. */
+  private async uploadDocuments(): Promise<{ uploadId: string; fileName: string }[]> {
+    const files = this.files();
+    const uploaded: { uploadId: string; fileName: string }[] = [];
+    this.busy.set('uploadingDocuments');
+    this.uploadPercent.set(0);
+    for (const [index, file] of files.entries()) {
+      const contentType = documentContentType(file);
+      if (!contentType) throw new Error('type');
+      const { uploadId, upload } = await firstValueFrom(
+        this.api.createDocumentUpload({ contentType, size: file.size }),
+      );
+      // The presigned POST pins the content type, the browser must send the same one.
+      const typed =
+        file.type === contentType ? file : new File([file], file.name, { type: contentType });
+      await new Promise<void>((resolve, reject) => {
+        this.work = this.api.uploadToS3(upload, typed).subscribe({
+          next: (event) => {
+            if (event.kind === 'progress') {
+              this.uploadPercent.set(
+                Math.round(((index + event.percent / 100) / files.length) * 100),
+              );
+            }
+          },
+          error: reject,
+          complete: resolve,
+        });
+      });
+      uploaded.push({ uploadId, fileName: file.name });
+    }
+    return uploaded;
+  }
+
+  // ------------------------------------------------------------ saving
+
+  /** The one save: the whole state of the dialog in one request. */
   protected async save(): Promise<void> {
-    if (this.saving()) return;
-    this.formSubmitted.set(true);
+    if (this.working()) return;
+    this.submitted.set(true);
     this.form.markAllAsTouched();
-    const result = toClaimFields(this.form.getRawValue(), this.preferences.formats());
-    if (!result.ok) {
-      const first = CLAIM_FIELD_NAMES.find((name) => result.errors[name]);
+    const existing = this.claim();
+    const personId = this.personId();
+    if (!existing && !personId) this.personMissing.set(true);
+    const result = this.result();
+    if (!result.ok || (!existing && !personId)) {
+      const first = CLAIM_FIELD_NAMES.find((name) => !result.ok && result.errors[name]);
       if (first) this.host.nativeElement.querySelector<HTMLElement>(`#f-${first}`)?.focus();
       return;
     }
-    this.saving.set(true);
     this.error.set(null);
     try {
-      const existing = this.claim();
+      const newDocuments = await this.uploadDocuments();
+      this.busy.set('saving');
+      const body = { ...result.request, newDocuments, removedDocumentIds: this.removedIds() };
       if (existing) {
-        await firstValueFrom(this.api.saveClaim(existing.claimId, result.fields));
-      } else {
         await firstValueFrom(
-          this.api.createClaim({ personId: this.personId() as string, ...result.fields }),
+          this.api.saveClaim(existing.claimId, { ...body, version: existing.updatedAt }),
         );
+      } else {
+        await firstValueFrom(this.api.createClaim({ ...body, personId: personId as string }));
       }
       this.draftId = null; // saved, nothing left to discard
       this.finish('saved');
     } catch (error) {
-      const code = error instanceof HttpErrorResponse ? error.error?.error?.code : undefined;
-      this.error.set(
-        code === 'amount_below_reimbursed' ? 'errors.amountBelowReimbursed' : 'errors.saveFailed',
-      );
-      this.saving.set(false);
+      const code =
+        error instanceof HttpErrorResponse
+          ? error.status === 409
+            ? 'conflict'
+            : (error.error?.error?.code as string | undefined)
+          : undefined;
+      this.error.set((code && ERROR_KEYS[code]) || 'errors.saveFailed');
+      this.busy.set('idle');
     }
   }
 
   protected async deleteClaim(): Promise<void> {
     const existing = this.claim();
-    if (!existing || this.saving()) return;
-    this.saving.set(true);
+    if (!existing || this.working()) return;
+    this.busy.set('saving');
     try {
       await firstValueFrom(this.api.deleteClaim(existing.claimId));
       this.finish('deleted');
     } catch {
       this.confirm.set(null);
       this.error.set('errors.deleteFailed');
-      this.saving.set(false);
+      this.busy.set('idle');
     }
   }
 
@@ -388,10 +531,10 @@ export class ClaimDialogComponent implements OnDestroy {
     else this.requestClose();
   }
 
-  /** Cancel, Escape and the close button. Asks once if the user has edited fields. */
+  /** Cancel, Escape and the close button. Asks once if the user has edited anything. */
   protected requestClose(): void {
-    if (this.saving()) return;
-    const hasEdits = this.step() === 'review' && this.form.dirty;
+    if (this.busy() === 'saving' || this.busy() === 'uploadingDocuments') return;
+    const hasEdits = this.form.dirty || this.files().length > 0 || this.removedIds().length > 0;
     if (hasEdits && this.confirm() === null) {
       this.confirm.set('discard');
       return;
@@ -403,7 +546,7 @@ export class ClaimDialogComponent implements OnDestroy {
     this.closing = true;
     this.work?.unsubscribe();
     await this.deleteDraft();
-    this.ref.close(this.historyChanged ? 'saved' : 'cancelled');
+    this.ref.close('cancelled');
   }
 
   private async deleteDraft(): Promise<void> {
@@ -424,10 +567,12 @@ export class ClaimDialogComponent implements OnDestroy {
 
   // ------------------------------------------------------------ helpers
 
-  private fill(values: Record<ClaimFieldName, string>): void {
+  private fill(values: ClaimFormValues): void {
+    this.baseline = values;
     this.form.reset(values, { emitEvent: false });
     this.form.markAsPristine();
     this.form.markAsUntouched();
+    this.revision.update((n) => n + 1);
   }
 
   private setPdf(url: string | null): void {

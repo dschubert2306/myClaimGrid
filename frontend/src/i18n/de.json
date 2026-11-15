@@ -93,19 +93,6 @@
     "outstanding": "Ausstehend",
     "selfBorne": "Selbst getragen"
   },
-  "table": {
-    "date": "Datum",
-    "provider": "Arzt oder Klinik",
-    "invoiceNumber": "Rechnungsnr.",
-    "amount": "Betrag",
-    "status": "Status",
-    "person": "Person",
-    "reimbursement": "Erstattung",
-    "payment": "Selbst bezahlt",
-    "reimbursed": "Erstattet",
-    "outstanding": "Ausstehend",
-    "total": "Summe"
-  },
   "status": {
     "DRAFT": "Entwurf",
     "OPEN": "Offen",
@@ -133,7 +120,6 @@
     "amount": "Bitte gib einen Betrag größer als 0 ein.",
     "maxLength": "Der Text ist zu lang.",
     "person": "Bitte wähle eine Person aus.",
-    "file": "Bitte wähle eine PDF-Datei aus.",
     "fileType": "Bitte wähle eine PDF-Datei aus. Andere Dateitypen sind nicht möglich.",
     "fileSize": "Die Datei ist größer als 10 MB.",
     "uploadFailed": "Das Hochladen hat nicht geklappt. Bitte versuche es erneut.",
@@ -142,39 +128,26 @@
     "loadClaimFailed": "Die Rechnung konnte nicht geladen werden.",
     "cents": "Bitte gib einen Betrag von 0 oder mehr ein.",
     "aboveInvoice": "Erstattet und abgelehnt dürfen zusammen nicht über dem Rechnungsbetrag liegen.",
-    "amountBelowReimbursed": "Der Betrag ist kleiner als das, was schon erstattet oder abgelehnt wurde.",
     "documentType": "Bitte wähle eine PDF-, JPG- oder PNG-Datei.",
     "invalidDocument": "Eine Datei ist kein gültiges PDF, JPG oder PNG.",
-    "conflict": "Die Rechnung wurde inzwischen geändert. Bitte schließe sie und öffne sie erneut."
+    "conflict": "Die Rechnung wurde inzwischen geändert. Bitte schließe sie und öffne sie erneut.",
+    "belowReimbursed": "Der Betrag ist kleiner als das, was schon erstattet oder abgelehnt wurde.",
+    "dateBeforeLatest": "Das Datum darf nicht vor dem letzten Eintrag im Verlauf liegen.",
+    "tooManyEntries": "Der Verlauf ist voll. Es sind höchstens 50 Einträge möglich.",
+    "tooManyDocuments": "Höchstens 20 Dokumente pro Rechnung."
   },
   "dialog": {
     "newTitle": "Neue Rechnung",
     "editTitle": "Rechnung bearbeiten",
     "close": "Schließen",
-    "stepsLabel": "Schritte",
-    "steps": {
-      "type": "Person und Art",
-      "reading": "Auslesen",
-      "review": "Daten prüfen"
-    },
-    "mode": {
-      "label": "Art",
-      "upload": "PDF hochladen",
-      "uploadHint": "Die Daten werden aus der Rechnung ausgelesen.",
-      "manual": "Manuell erfassen",
-      "manualHint": "Ohne PDF, du trägst die Daten selbst ein."
-    },
     "personPlaceholder": "Bitte wählen",
     "for": "Für {{name}}",
-    "back": "Zurück",
     "cancel": "Abbrechen",
-    "next": "Weiter",
-    "upload": "Hochladen",
     "save": "Speichern",
     "saving": "Rechnung wird gespeichert",
     "delete": "Löschen",
     "deleteClaim": "Rechnung löschen",
-    "confirmDelete": "Die Rechnung und die PDF-Datei werden gelöscht. Das lässt sich nicht rückgängig machen.",
+    "confirmDelete": "Die Rechnung, ihre PDF-Datei und die Dokumente der Versicherung werden gelöscht. Das lässt sich nicht rückgängig machen.",
     "confirmDiscard": "Deine Eingaben gehen verloren. Verwerfen?",
     "discardYes": "Verwerfen",
     "keepEditing": "Weiter bearbeiten",
@@ -186,7 +159,10 @@
     "removeFile": "Datei entfernen",
     "dropTitle": "PDF hierher ziehen oder Datei auswählen",
     "dropOver": "Loslassen zum Hinzufügen",
-    "dropMeta": "Nur PDF, höchstens 10 MB"
+    "dropMeta": "Nur PDF, höchstens 10 MB",
+    "invoice": "Rechnung",
+    "invoicePdf": "Rechnung als PDF (optional)",
+    "invoicePdfHint": "Die Felder unten werden aus der Rechnung ausgefüllt. Du kannst sie ändern."
   },
   "date": {
     "open": "Kalender öffnen",
@@ -229,63 +205,22 @@
       "PARTLY_PAID": "Teilweise erstattet",
       "PAID": "Erstattet"
     },
-    "notSubmitted": "nicht eingereicht",
-    "submittedOn": "eingereicht am {{date}}",
-    "payment": {
-      "paid": "Bezahlt",
-      "unpaid": "Nicht bezahlt",
-      "paidOn": "Bezahlt am {{date}}"
-    },
     "section": "Erstattung",
-    "current": "Aktueller Stand",
-    "invoiceAmount": "Rechnungsbetrag",
-    "reimbursed": "Erstattet",
-    "rejected": "Abgelehnt oder Selbstbehalt",
-    "outstanding": "Ausstehend",
-    "selfBorne": "Selbst getragen",
-    "difference": "Differenz zum Rechnungsbetrag",
     "history": "Verlauf",
-    "empty": "Noch keine Einträge. Füge einen hinzu, sobald die Versicherung reagiert.",
-    "immediate": "Einträge und Dokumente werden sofort gespeichert.",
-    "add": "Eintrag hinzufügen",
+    "empty": "Noch keine Änderungen. Jede Änderung der Erstattung erscheint hier nach dem Speichern.",
     "entryReimbursed": "Erstattet {{amount}}",
     "entryRejected": "Abgelehnt {{amount}}",
-    "deleteEntry": "Eintrag löschen",
-    "confirmDeleteEntry": "Der Eintrag und seine Dokumente werden gelöscht. Das lässt sich nicht rückgängig machen.",
-    "openDocument": "{{name}} öffnen",
-    "deleteDocument": "{{name}} löschen",
-    "confirmDeleteDocument": "Das Dokument {{name}} wird gelöscht. Das lässt sich nicht rückgängig machen.",
-    "documentFailed": "Das Dokument konnte nicht geöffnet werden. Bitte versuche es erneut.",
-    "deleteFailed": "Das konnte nicht gelöscht werden. Bitte versuche es erneut.",
-    "needsSave": "Speichere die Rechnung zuerst, dann kannst du den Erstattungsverlauf pflegen."
-  },
-  "tracking": {
-    "title": "Einreichung und Zahlung",
-    "submittedAt": "Eingereicht am",
+    "submittedAt": "Bei der Versicherung eingereicht am",
     "submittedHint": "Leer, solange die Rechnung nicht eingereicht ist.",
-    "paidAt": "Rechnung bezahlt am",
-    "paidHint": "Wann du die Rechnung selbst bezahlt hast. Leer, solange sie offen ist."
-  },
-  "entry": {
-    "title": "Eintrag hinzufügen",
-    "status": "Status",
-    "date": "Datum des Eintrags",
+    "statusLabel": "Status",
+    "date": "Datum des Status",
     "reimbursedAmount": "Erstatteter Betrag",
-    "reimbursedHint": "Nur der Betrag dieser Zahlung. Mehrere Teilerstattungen werden addiert.",
+    "reimbursedHint": "Insgesamt bisher erstattet, frühere Zahlungen eingerechnet.",
     "rejectedAmount": "Abgelehnt oder Selbstbehalt",
-    "rejectedHint": "Optional, Betrag dieser Abrechnung.",
-    "note": "Notiz",
+    "rejectedHint": "Insgesamt bisher abgelehnt, optional.",
+    "note": "Notiz zu dieser Änderung",
     "notePlaceholder": "Optional",
-    "documents": "Dokumente",
-    "dropTitle": "Leistungsabrechnung oder Brief hierher ziehen oder Dateien auswählen",
-    "dropMeta": "PDF, JPG oder PNG, je höchstens 10 MB",
-    "removeFile": "{{name}} entfernen",
-    "preview": "Danach erstattet: {{reimbursed}} von {{amount}}. Differenz: {{difference}}",
-    "save": "Eintrag speichern",
-    "uploading": "Dokumente werden hochgeladen",
-    "saving": "Eintrag wird gespeichert",
-    "saveFailed": "Der Eintrag konnte nicht gespeichert werden. Bitte versuche es erneut.",
-    "tooManyFiles": "Höchstens 10 Dokumente pro Eintrag."
+    "preview": "Erstattet: {{reimbursed}} von {{amount}}. Differenz: {{difference}}"
   },
   "list": {
     "person": "Person",
@@ -301,6 +236,33 @@
     "reset": "Filter zurücksetzen",
     "count": "{{count}} von {{total}} Rechnungen",
     "empty": "Keine Rechnung passt zu den Filtern.",
-    "noClaims": "Noch keine Rechnungen für {{year}}."
+    "noClaims": "Noch keine Rechnungen für {{year}}.",
+    "totals": "Summe {{amount}}, erstattet {{reimbursed}}, ausstehend {{outstanding}}"
+  },
+  "payment": {
+    "title": "Zahlung",
+    "toggle": "Rechnung bezahlt",
+    "date": "Zahlungsdatum",
+    "paidOn": "Bezahlt am {{date}}",
+    "unpaid": "Nicht bezahlt"
+  },
+  "documents": {
+    "title": "Dokumente der Versicherung",
+    "dropTitle": "Leistungsabrechnung oder Brief hierher ziehen oder Dateien auswählen",
+    "dropMeta": "PDF, JPG oder PNG, je höchstens 10 MB",
+    "open": "{{name}} öffnen",
+    "remove": "{{name}} entfernen",
+    "tooMany": "Höchstens {{max}} Dokumente pro Rechnung.",
+    "uploading": "Dokumente werden hochgeladen",
+    "openFailed": "Das Dokument konnte nicht geöffnet werden. Bitte versuche es erneut."
+  },
+  "card": {
+    "invoiceAmount": "Rechnungsbetrag",
+    "reimbursed": "Erstattet",
+    "outstanding": "Ausstehend",
+    "difference": "Differenz zum Rechnungsbetrag",
+    "submitted": "Eingereicht",
+    "notYet": "Noch nicht",
+    "documents": "Dokumente"
   }
 }

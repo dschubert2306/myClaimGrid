@@ -64,30 +64,6 @@ export type PersonsResponse = z.infer<typeof personsResponseSchema>;
 
 // ----------------------------------------------------------------- claims
 
-/** Fields the user edits in the review step. */
-export const claimFieldsSchema = z.strictObject({
-  provider: z.string().trim().min(1).max(200),
-  invoiceNumber: z.string().trim().max(100).optional().default(''),
-  invoiceDate: isoDateSchema,
-  amount: amountCentsSchema,
-  description: z.string().trim().max(500).optional().default(''),
-  /** Submitted to the insurer on this date: set means submitted. Null clears it, absent keeps it. */
-  submittedAt: isoDateSchema.nullable().optional(),
-  /** The user paid the invoice on this date, independent of the reimbursement. Null clears it. */
-  paidAt: isoDateSchema.nullable().optional(),
-});
-export type ClaimFields = z.infer<typeof claimFieldsSchema>;
-export type ClaimFieldsInput = z.input<typeof claimFieldsSchema>;
-
-export const createManualClaimRequestSchema = claimFieldsSchema.safeExtend({
-  personId: idSchema,
-});
-export type CreateManualClaimRequest = z.infer<typeof createManualClaimRequestSchema>;
-
-/** PUT /claims/{id}. The person of a claim cannot be changed in release 1. */
-export const saveClaimRequestSchema = claimFieldsSchema;
-export type SaveClaimRequest = z.infer<typeof saveClaimRequestSchema>;
-
 export const extractableFieldSchema = z.enum([
   'provider',
   'invoiceNumber',
@@ -106,13 +82,13 @@ export type Extraction = z.infer<typeof extractionSchema>;
 // ---------------------------------------------------------- reimbursement
 
 /**
- * How far the insurer is with the reimbursement. Independent of `paidAt` (the user paid the
- * invoice) and of `ClaimStatus` (draft or saved record).
+ * How far the insurer is with the reimbursement. Independent of the payment status (`paid`, the
+ * user paid the invoice) and of `ClaimStatus` (draft or saved record).
  */
 export const reimbursementStatusSchema = z.enum(['OPEN', 'IN_PROGRESS', 'PARTLY_PAID', 'PAID']);
 export type ReimbursementStatus = z.infer<typeof reimbursementStatusSchema>;
 
-/** Statuses whose history entry carries a reimbursed amount (and optionally a rejected one). */
+/** Statuses that carry a reimbursed amount (and optionally a rejected one). */
 export const PAYMENT_STATUSES: readonly ReimbursementStatus[] = ['PARTLY_PAID', 'PAID'];
 export const isPaymentStatus = (status: ReimbursementStatus): boolean =>
   PAYMENT_STATUSES.includes(status);
@@ -124,7 +100,7 @@ export const nonNegativeCentsSchema = z.number().int().min(0).max(100_000_000_00
 export const DOCUMENT_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
 export const documentContentTypeSchema = z.enum(DOCUMENT_CONTENT_TYPES);
 export type DocumentContentType = z.infer<typeof documentContentTypeSchema>;
-export const MAX_DOCUMENTS_PER_ENTRY = 10;
+export const MAX_DOCUMENTS_PER_CLAIM = 20;
 export const MAX_ENTRIES_PER_CLAIM = 50;
 
 /** Display name of an uploaded file. Path separators and control characters are replaced. */
@@ -145,17 +121,44 @@ export const insurerDocumentSchema = z.strictObject({
 });
 export type InsurerDocument = z.infer<typeof insurerDocumentSchema>;
 
+/**
+ * The reimbursement state as the dialog saves it. Amounts are the totals so far (what the card
+ * shows), only for PAID and PARTLY_PAID. The server compares them with the history and records the
+ * change as a new entry. Any change to this block creates exactly one entry.
+ */
+export const reimbursementInputSchema = z
+  .strictObject({
+    status: reimbursementStatusSchema,
+    /** Date of this status (for example the date on the benefit statement). */
+    date: isoDateSchema.optional(),
+    reimbursedAmount: nonNegativeCentsSchema.optional(),
+    rejectedAmount: nonNegativeCentsSchema.optional(),
+    /** Comment on this change, kept in the history entry. Empty means none. */
+    note: z.string().trim().max(500).optional().default(''),
+  })
+  .superRefine((input, ctx) => {
+    const pays = isPaymentStatus(input.status);
+    if (pays && input.reimbursedAmount === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reimbursedAmount'], message: 'Required' });
+    }
+    if (!pays && input.reimbursedAmount !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reimbursedAmount'], message: 'Not allowed' });
+    }
+    if (!pays && input.rejectedAmount !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['rejectedAmount'], message: 'Not allowed' });
+    }
+  });
+
+/** One history entry: the status at that time and what changed. Created by saving, never edited. */
 export const reimbursementEntrySchema = z.strictObject({
   entryId: idSchema,
   status: reimbursementStatusSchema,
-  /** Date of the event (for example the date on the benefit statement). */
   date: isoDateSchema,
-  /** Cents paid out with this entry. Only for PAID and PARTLY_PAID, entries add up. */
+  /** Cents reimbursed with this entry (a correction downwards is negative). Entries add up. */
   reimbursedAmount: z.number().int().nullable(),
-  /** Cents the insurer rejected or kept as deductible with this entry. */
+  /** Cents rejected or kept as deductible with this entry, same rules. */
   rejectedAmount: z.number().int().nullable(),
   note: z.string(),
-  documents: z.array(insurerDocumentSchema),
   createdAt: z.string(),
 });
 export type ReimbursementEntry = z.infer<typeof reimbursementEntrySchema>;
@@ -183,7 +186,7 @@ export const createDocumentUploadRequestSchema = z.strictObject({
 });
 export type CreateDocumentUploadRequest = z.infer<typeof createDocumentUploadRequestSchema>;
 
-/** Presigned POST into the staging area. The file becomes part of the claim with the entry. */
+/** Presigned POST into the staging area. The file becomes part of the claim when it is saved. */
 export const createDocumentUploadResponseSchema = z.strictObject({
   uploadId: idSchema,
   upload: z.strictObject({
@@ -193,44 +196,80 @@ export const createDocumentUploadResponseSchema = z.strictObject({
 });
 export type CreateDocumentUploadResponse = z.infer<typeof createDocumentUploadResponseSchema>;
 
-export const createEntryRequestSchema = z
-  .strictObject({
-    status: reimbursementStatusSchema,
-    date: isoDateSchema,
-    reimbursedAmount: nonNegativeCentsSchema.optional(),
-    rejectedAmount: nonNegativeCentsSchema.optional(),
-    note: z.string().trim().max(500).optional().default(''),
-    documents: z
-      .array(z.strictObject({ uploadId: idSchema, fileName: fileNameSchema }))
-      .max(MAX_DOCUMENTS_PER_ENTRY)
-      .optional()
-      .default([]),
-  })
-  .superRefine((entry, ctx) => {
-    const pays = isPaymentStatus(entry.status);
-    if (pays && entry.reimbursedAmount === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reimbursedAmount'], message: 'Required' });
-    }
-    if (!pays && entry.reimbursedAmount !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reimbursedAmount'], message: 'Not allowed' });
-    }
-    if (!pays && entry.rejectedAmount !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['rejectedAmount'], message: 'Not allowed' });
-    }
-    const ids = entry.documents.map((d) => d.uploadId);
-    if (new Set(ids).size !== ids.length) {
-      ctx.addIssue({ code: 'custom', path: ['documents'], message: 'Duplicate upload' });
-    }
-  });
-export type CreateEntryRequest = z.infer<typeof createEntryRequestSchema>;
-export type CreateEntryRequestInput = z.input<typeof createEntryRequestSchema>;
-
 /** Short-lived presigned GET for one insurer document. */
 export const documentUrlResponseSchema = z.strictObject({
   url: z.string(),
   expiresIn: z.number().int(),
 });
 export type DocumentUrlResponse = z.infer<typeof documentUrlResponseSchema>;
+
+/**
+ * Everything the claim dialog saves in one request. It is a full save: the client always sends the
+ * whole state of the dialog, nothing is "kept" by leaving a field out.
+ */
+const claimSaveShape = {
+  provider: z.string().trim().min(1).max(200),
+  invoiceNumber: z.string().trim().max(100).optional().default(''),
+  invoiceDate: isoDateSchema,
+  amount: amountCentsSchema,
+  description: z.string().trim().max(500).optional().default(''),
+  /** Submitted to the insurer on this date, null while it has not been submitted. */
+  submittedAt: isoDateSchema.nullable(),
+  /** Payment status (my side): the user paid the invoice. The date is required while it is on. */
+  paid: z.boolean(),
+  paidAt: isoDateSchema.nullable().optional().default(null),
+  reimbursement: reimbursementInputSchema,
+  /** Insurer documents to attach: uploads from POST /document-uploads. */
+  newDocuments: z
+    .array(z.strictObject({ uploadId: idSchema, fileName: fileNameSchema }))
+    .max(MAX_DOCUMENTS_PER_CLAIM)
+    .optional()
+    .default([]),
+  /** Insurer documents to delete. */
+  removedDocumentIds: z.array(idSchema).max(MAX_DOCUMENTS_PER_CLAIM).optional().default([]),
+};
+
+/** Payment date follows the toggle: required while "paid" is on, absent while it is off. */
+function checkSaveRules(
+  body: {
+    paid: boolean;
+    paidAt: string | null;
+    newDocuments: { uploadId: string }[];
+    removedDocumentIds: string[];
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (body.paid && body.paidAt === null) {
+    ctx.addIssue({ code: 'custom', path: ['paidAt'], message: 'Required' });
+  }
+  if (!body.paid && body.paidAt !== null) {
+    ctx.addIssue({ code: 'custom', path: ['paidAt'], message: 'Not allowed' });
+  }
+  const uploads = body.newDocuments.map((d) => d.uploadId);
+  if (new Set(uploads).size !== uploads.length) {
+    ctx.addIssue({ code: 'custom', path: ['newDocuments'], message: 'Duplicate upload' });
+  }
+  if (new Set(body.removedDocumentIds).size !== body.removedDocumentIds.length) {
+    ctx.addIssue({ code: 'custom', path: ['removedDocumentIds'], message: 'Duplicate document' });
+  }
+}
+
+/** POST /claims. */
+export const createClaimRequestSchema = z
+  .strictObject({ personId: idSchema, ...claimSaveShape })
+  .superRefine(checkSaveRules);
+export type CreateClaimRequest = z.infer<typeof createClaimRequestSchema>;
+export type CreateClaimRequestInput = z.input<typeof createClaimRequestSchema>;
+
+/**
+ * PUT /claims/{id}. The person of a claim cannot be changed. `version` is the `updatedAt` the
+ * dialog was opened with: a claim that changed in the meantime is refused with 409.
+ */
+export const saveClaimRequestSchema = z
+  .strictObject({ version: z.string().min(1), ...claimSaveShape })
+  .superRefine(checkSaveRules);
+export type SaveClaimRequest = z.infer<typeof saveClaimRequestSchema>;
+export type SaveClaimRequestInput = z.input<typeof saveClaimRequestSchema>;
 
 // ----------------------------------------------------------------- claim
 
@@ -250,8 +289,11 @@ export const claimSchema = z.strictObject({
   extractionStatus: extractionStatusSchema.nullable(),
   extraction: extractionSchema.nullable(),
   submittedAt: isoDateSchema.nullable(),
+  /** Payment status: the date the user paid the invoice, null while it is unpaid. */
   paidAt: isoDateSchema.nullable(),
   reimbursement: reimbursementSchema,
+  /** Insurer documents of the claim. */
+  documents: z.array(insurerDocumentSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

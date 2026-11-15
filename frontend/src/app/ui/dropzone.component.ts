@@ -36,7 +36,7 @@ import { IconComponent } from './icon.component';
             variant="ghost"
             [iconOnly]="true"
             [attr.aria-label]="'dialog.removeFile' | transloco"
-            (click)="remove()"
+            (click)="clear()"
           >
             <mcg-icon name="close" />
           </button>
@@ -116,7 +116,8 @@ export class DropzoneComponent {
     this.accept(event.dataTransfer?.files?.[0] ?? null); // one file, a second drop replaces the first
   }
 
-  protected remove(): void {
+  /** Forgets the chosen file, also called by the parent when it cannot use the file yet. */
+  clear(): void {
     this.file.set(null);
     this.problem.set(null);
   }

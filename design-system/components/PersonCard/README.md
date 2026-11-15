@@ -2,7 +2,7 @@
 
 One dashboard column per person: name, total and count for the selected year, and the compact claims table.
 
-Markup: `<section class="mcg-person" style="--person: <person color>">`. The consumer provides the person (name, color), the year, the dashboard figures, and the claim list for the embedded ClaimTable.
+Markup: `<section class="mcg-person" style="--person: <person color>">`. The consumer provides the person (name, color), the year, the dashboard figures, and the claim list, shown as stacked ClaimCards.
 
 - The person's color shows as the 4px top bar (`border-bar`) and the 8px square before the name. Default colors are `person-1` to `person-3`. Never tint the card body.
 - The total is the hero figure: `figure`, tabular, locale formatted. The count sits on the right.

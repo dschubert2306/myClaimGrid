@@ -114,7 +114,15 @@ describe('extraction Lambda', () => {
     await claimsHandler(
       apiEvent('PUT /claims/{id}', {
         pathParameters: { id: claimId },
-        body: { provider: 'Manuell', invoiceDate: '2026-01-01', amount: 100 },
+        body: {
+          version: stored(claimId).updatedAt,
+          provider: 'Manuell',
+          invoiceDate: '2026-01-01',
+          amount: 100,
+          submittedAt: null,
+          paid: false,
+          reimbursement: { status: 'OPEN' },
+        },
       }),
     );
     s3.on(GetObjectCommand).resolves({ Body: body(pdf), ContentLength: pdf.length });

@@ -136,7 +136,7 @@ describe('ApiStack', () => {
 
   it('protects every route with the JWT authorizer', () => {
     const routes = Object.values(template.findResources('AWS::ApiGatewayV2::Route'));
-    expect(routes).toHaveLength(14);
+    expect(routes).toHaveLength(11);
     for (const route of routes) {
       expect(route.Properties.AuthorizationType).toBe('JWT');
       expect(route.Properties.AuthorizerId).toBeDefined();
@@ -145,12 +145,12 @@ describe('ApiStack', () => {
 
   it('runs Node.js 22 functions with 30 day log retention', () => {
     const functions = Object.values(template.findResources('AWS::Lambda::Function')).filter(
-      (f) => f.Properties.Environment?.Variables?.TABLE_NAME !== undefined, // our five, not CDK's helper
+      (f) => f.Properties.Environment?.Variables?.TABLE_NAME !== undefined, // our four, not CDK's helper
     );
-    expect(functions).toHaveLength(5);
+    expect(functions).toHaveLength(4);
     for (const fn of functions) expect(fn.Properties.Runtime).toBe('nodejs22.x');
     const groups = Object.values(template.findResources('AWS::Logs::LogGroup'));
-    expect(groups).toHaveLength(5);
+    expect(groups).toHaveLength(4);
     for (const group of groups) expect(group.Properties.RetentionInDays).toBe(30);
   });
 
@@ -170,7 +170,7 @@ describe('ApiStack', () => {
     const policies = Object.entries(template.findResources('AWS::IAM::Policy')).filter(([id]) =>
       /Function.*ServiceRoleDefaultPolicy/.test(id),
     );
-    expect(policies).toHaveLength(5);
+    expect(policies).toHaveLength(4);
     for (const [, policy] of policies) {
       const statements = policy.Properties.PolicyDocument.Statement as {
         Action: string | string[];
@@ -199,24 +199,29 @@ describe('ApiStack S3 prefixes', () => {
     ...(JSON.stringify(statement.Resource).match(/\/(uploads|incoming|insurer)\/\*/g) ?? []),
   ];
 
-  it('lets the reimbursement function touch only the staging and insurer prefixes', () => {
-    const statements = s3Statements(/^ReimbursementFunction.*Policy/);
-    expect(statements).toHaveLength(1);
-    expect([...(statements[0]?.Action as string[])].sort()).toEqual([
-      's3:DeleteObject',
-      's3:GetObject',
-      's3:PutObject',
+  it('lets the claims function touch the invoices, the staging area and the insurer documents, nothing else', () => {
+    const statements = s3Statements(/^ClaimsFunction.*Policy/);
+    expect(statements).toHaveLength(2);
+    for (const statement of statements) {
+      expect([...(statement.Action as string[])].sort()).toEqual([
+        's3:DeleteObject',
+        's3:GetObject',
+        's3:PutObject',
+      ]);
+    }
+    expect(statements.map((s) => prefixes(s).sort())).toEqual([
+      ['/uploads/*'],
+      ['/incoming/*', '/insurer/*'],
     ]);
-    expect(prefixes(statements[0]!).sort()).toEqual(['/incoming/*', '/insurer/*']);
   });
 
-  it('gives the claims function only DeleteObject on the insurer documents', () => {
-    const statements = s3Statements(/^ClaimsFunction.*Policy/);
-    const insurer = statements.filter((s) => prefixes(s).includes('/insurer/*'));
-    expect(insurer).toHaveLength(1);
-    expect(insurer[0]?.Action).toBe('s3:DeleteObject');
-    expect(prefixes(insurer[0]!)).toEqual(['/insurer/*']);
-    for (const s of statements) expect(prefixes(s)).not.toContain('/incoming/*');
+  it('gives the other functions no access to the staging area or the insurer documents', () => {
+    for (const fn of [/^PersonsFunction.*Policy/, /^DashboardFunction.*Policy/]) {
+      expect(s3Statements(fn)).toEqual([]);
+    }
+    for (const s of s3Statements(/^ExtractionFunction.*Policy/)) {
+      expect(prefixes(s)).toEqual(['/uploads/*']);
+    }
   });
 });
 

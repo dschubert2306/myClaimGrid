@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import type { ReimbursementStatus } from '@myclaimgrid/shared';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { McgDatePipe } from '../core/pipes';
@@ -12,28 +12,20 @@ import { McgDatePipe } from '../core/pipes';
   selector: 'mcg-reimbursement-badge',
   imports: [TranslocoPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'app-badge-group' },
   template: `<span
-      class="mcg-badge"
-      data-testid="reimbursement-badge"
-      [class.mcg-badge--pending]="status() === 'IN_PROGRESS'"
-      [class.mcg-badge--partial]="status() === 'PARTLY_PAID'"
-      [class.mcg-badge--done]="status() === 'PAID'"
-      >{{ 'reimbursement.status.' + status() | transloco }}</span
-    >
-    @if (notSubmitted()) {
-      <span class="app-badge-note">{{ 'reimbursement.notSubmitted' | transloco }}</span>
-    }`,
+    class="mcg-badge"
+    data-testid="reimbursement-badge"
+    [class.mcg-badge--pending]="status() === 'IN_PROGRESS'"
+    [class.mcg-badge--partial]="status() === 'PARTLY_PAID'"
+    [class.mcg-badge--done]="status() === 'PAID'"
+    >{{ 'reimbursement.status.' + status() | transloco }}</span
+  >`,
 })
 export class ReimbursementBadgeComponent {
   readonly status = input.required<ReimbursementStatus>();
-  /** Pass the submission date to show "nicht eingereicht" next to an OPEN status. */
-  readonly submittedAt = input<string | null | undefined>(undefined);
-  protected readonly notSubmitted = computed(
-    () => this.status() === 'OPEN' && this.submittedAt() === null,
-  );
 }
 
+/** Payment status: "Paid on 20.03.2026" or "Not paid". The date is part of the badge. */
 @Component({
   selector: 'mcg-payment-badge',
   imports: [TranslocoPipe, McgDatePipe],
@@ -42,11 +34,10 @@ export class ReimbursementBadgeComponent {
     class="mcg-badge"
     data-testid="payment-badge"
     [class.mcg-badge--done]="!!paidAt()"
-    [attr.title]="
-      paidAt() ? ('reimbursement.payment.paidOn' | transloco: { date: paidAt() | mcgDate }) : null
-    "
     >{{
-      (paidAt() ? 'reimbursement.payment.paid' : 'reimbursement.payment.unpaid') | transloco
+      paidAt()
+        ? ('payment.paidOn' | transloco: { date: paidAt() | mcgDate })
+        : ('payment.unpaid' | transloco)
     }}</span
   >`,
 })

@@ -36,7 +36,8 @@ export class ApiStack extends cdk.Stack {
       bucketArn: props.invoicesBucketArn,
     });
     const uploadsArn = bucket.arnForObjects('uploads/*');
-    // Insurer documents: staged on upload (expire after a day), moved next to the claim on save.
+    // Insurer documents: staged on upload (expire after a day), moved next to the claim when the
+    // claim is saved.
     const stagingArn = bucket.arnForObjects('incoming/*');
     const insurerArn = bucket.arnForObjects('insurer/*');
 
@@ -73,9 +74,11 @@ export class ApiStack extends cdk.Stack {
       });
 
     const personsFn = createFunction('PersonsFunction', 'persons.ts');
-    const claimsFn = createFunction('ClaimsFunction', 'claims.ts');
+    // Saving a claim also checks and moves its insurer documents, which can take a moment.
+    const claimsFn = createFunction('ClaimsFunction', 'claims.ts', {
+      timeout: cdk.Duration.seconds(20),
+    });
     const dashboardFn = createFunction('DashboardFunction', 'dashboard.ts');
-    const reimbursementFn = createFunction('ReimbursementFunction', 'reimbursement.ts');
     this.extractionFunction = createFunction('ExtractionFunction', 'extract.ts', {
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
@@ -92,7 +95,6 @@ export class ApiStack extends cdk.Stack {
       'dynamodb:DeleteItem',
     );
     props.table.grant(this.extractionFunction, 'dynamodb:Query', 'dynamodb:PutItem');
-    props.table.grant(reimbursementFn, 'dynamodb:Query', 'dynamodb:PutItem');
 
     // Presigned URLs are signed with the role of the function, so it needs the permission itself.
     claimsFn.addToRolePolicy(
@@ -101,20 +103,16 @@ export class ApiStack extends cdk.Stack {
         resources: [uploadsArn],
       }),
     );
-    // Deleting a claim removes its insurer documents too. Nothing else of that prefix.
+    // Insurer documents: presigned POST into staging (PutObject), check and copy on save (GetObject
+    // covers HeadObject and the copy source), signed links and deletion. Nothing else.
     claimsFn.addToRolePolicy(
-      new iam.PolicyStatement({ actions: ['s3:DeleteObject'], resources: [insurerArn] }),
-    );
-    this.extractionFunction.addToRolePolicy(
-      new iam.PolicyStatement({ actions: ['s3:GetObject'], resources: [uploadsArn] }),
-    );
-    // Presigned POST into staging (PutObject), check and copy (GetObject covers HeadObject and the
-    // copy source), signed links and deletion. No access to the invoices under uploads/.
-    reimbursementFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['s3:PutObject', 's3:GetObject', 's3:DeleteObject'],
         resources: [stagingArn, insurerArn],
       }),
+    );
+    this.extractionFunction.addToRolePolicy(
+      new iam.PolicyStatement({ actions: ['s3:GetObject'], resources: [uploadsArn] }),
     );
     // Textract has no resource level permissions for AnalyzeExpense.
     this.extractionFunction.addToRolePolicy(
@@ -161,11 +159,8 @@ export class ApiStack extends cdk.Stack {
       [M.GET, '/claims/{id}', claimsFn],
       [M.PUT, '/claims/{id}', claimsFn],
       [M.DELETE, '/claims/{id}', claimsFn],
-      [M.POST, '/claims/{id}/documents', reimbursementFn],
-      [M.POST, '/claims/{id}/entries', reimbursementFn],
-      [M.DELETE, '/claims/{id}/entries/{entryId}', reimbursementFn],
-      [M.DELETE, '/claims/{id}/documents/{documentId}', reimbursementFn],
-      [M.GET, '/claims/{id}/documents/{documentId}/url', reimbursementFn],
+      [M.POST, '/document-uploads', claimsFn],
+      [M.GET, '/claims/{id}/documents/{documentId}/url', claimsFn],
       [M.GET, '/dashboard', dashboardFn],
     ];
     for (const [method, routePath, fn] of routes) {

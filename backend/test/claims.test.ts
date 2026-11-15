@@ -10,7 +10,14 @@ let db: ReturnType<typeof fakeDynamo>;
 let s3: ReturnType<typeof mockClient>;
 let personId: string;
 
-const fields = { provider: 'Praxis Dr. Beispiel', invoiceDate: '2026-03-12', amount: 12345 };
+const fields = {
+  provider: 'Praxis Dr. Beispiel',
+  invoiceDate: '2026-03-12',
+  amount: 12345,
+  submittedAt: null,
+  paid: false,
+  reimbursement: { status: 'OPEN' },
+};
 
 async function call(routeKey: string, options: Parameters<typeof apiEvent>[1] = {}) {
   return claimsHandler(apiEvent(routeKey, options));
@@ -119,7 +126,7 @@ describe('uploads and drafts', () => {
     const { claim } = await createDraft();
     const result = await call('PUT /claims/{id}', {
       pathParameters: { id: claim.claimId },
-      body: fields,
+      body: { ...fields, version: claim.updatedAt },
     });
     expect(result.statusCode).toBe(200);
     expect(json(result)).toMatchObject({ status: 'OPEN', year: 2026, extractionStatus: 'FAILED' });
@@ -135,7 +142,7 @@ describe('uploads and drafts', () => {
     const claim = json(await call('POST /claims', { body: { personId, ...fields } }));
     await call('PUT /claims/{id}', {
       pathParameters: { id: claim.claimId },
-      body: { ...fields, invoiceDate: '2025-12-31' },
+      body: { ...fields, invoiceDate: '2025-12-31', version: claim.updatedAt },
     });
     expect(await listYear(2025)).toHaveLength(1);
     expect(db.items().filter((i) => i.claimId === claim.claimId)).toHaveLength(1);
@@ -165,7 +172,7 @@ describe('single claim', () => {
     const put = await call('PUT /claims/{id}', {
       sub: 'intruder',
       pathParameters: { id: claim.claimId },
-      body: fields,
+      body: { ...fields, version: claim.updatedAt },
     });
     expect(put.statusCode).toBe(404);
     expect((await call('GET /claims/{id}', { pathParameters: { id: 'nope' } })).statusCode).toBe(

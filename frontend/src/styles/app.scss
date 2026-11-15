@@ -84,10 +84,26 @@ body {
   }
 }
 
-/* Claim dialog */
+/* Claim dialog. It never grows taller than the window: head and foot (with the one Save button)
+   stay in view and the form between them scrolls. */
 .app-scrim {
   position: fixed;
   inset: 0;
+  overflow-y: auto;
+}
+.app-scrim .mcg-dialog {
+  max-height: 100%;
+}
+.app-scrim .mcg-dialog__head,
+.app-scrim .mcg-dialog__foot {
+  flex: none;
+}
+.app-scrim .mcg-dialog__foot {
+  flex-wrap: wrap;
+}
+.app-dialog-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 .app-pdf {
@@ -305,7 +321,7 @@ body {
   }
 }
 
-/* Reimbursement tracking. Tokens only, see README "Design system gaps". */
+/* Reimbursement and payment tracking. Tokens only, see README "Design system gaps". */
 .app-small {
   font-size: 13px;
   line-height: 20px;
@@ -317,18 +333,6 @@ body {
   line-height: 24px;
   font-weight: 600;
 }
-.app-badge-group {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  white-space: nowrap;
-}
-.app-badge-note {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-muted);
-}
-
 /* Three figures under the totals of a person card, and the summary in the detail view */
 .app-figures {
   display: grid;
@@ -352,14 +356,8 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.app-figures--flush {
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--space-4);
-  padding: 0;
-  border-bottom: 0;
-}
 
-/* Claim form: submission and payment */
+/* Claim dialog: sections, each with a heading, divided by a hairline */
 .app-fieldset {
   display: flex;
   flex-direction: column;
@@ -369,23 +367,11 @@ body {
   padding: 0;
   border: 0;
 }
-
-/* Reimbursement section of the claim dialog */
-.app-reimbursement {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-top: var(--space-2);
+.app-fieldset--divided {
   padding-top: var(--space-6);
   border-top: var(--border-hairline) solid var(--line);
 }
-.app-reimbursement__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
+
 .app-history {
   margin: 0;
   padding: 0;
@@ -399,8 +385,7 @@ body {
   padding: var(--space-3) 0;
   border-bottom: var(--border-hairline) solid var(--line);
 }
-.app-history__row,
-.app-history__confirm {
+.app-history__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -410,12 +395,6 @@ body {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.app-history__doc {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
 }
 .app-doc-link {
   display: inline-flex;
@@ -455,12 +434,7 @@ body {
 .app-drop--compact {
   min-height: 120px;
 }
-/* The entry dialog sits above the claim dialog */
-.app-scrim--nested {
-  z-index: 1;
-}
-
-/* List view: filters and the full width table */
+/* List view: filters and the claim cards */
 .app-filters {
   display: flex;
   flex-wrap: wrap;
@@ -498,18 +472,6 @@ body {
   margin: 0;
   padding: var(--space-6);
 }
-.app-list__scroll {
-  overflow-x: auto;
-}
-.app-list-table tfoot th,
-.app-list-table tfoot td {
-  height: 40px;
-  background: var(--surface-sunken);
-  font-weight: 600;
-}
-.app-list-table__total-label {
-  text-align: left;
-}
 .app-person-mark {
   display: inline-flex;
   align-items: center;
@@ -521,11 +483,6 @@ body {
   width: 8px;
   height: 8px;
   background: var(--person, var(--person-1));
-}
-@media (max-width: 899.98px) {
-  .app-list-table__invoice {
-    display: none;
-  }
 }
 @media (max-width: 639.98px) {
   .app-filters {
@@ -541,4 +498,181 @@ body {
   .app-figures {
     padding: var(--space-3) var(--space-4);
   }
+}
+
+/* Claim cards: one claim with every status field at a glance. The title button covers the card. */
+.app-claim-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+.app-claim-cards--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+.app-claim-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-hairline) solid var(--line-strong);
+  transition: background-color 120ms ease-out;
+}
+.app-claim-card:hover {
+  background: var(--surface-sunken);
+}
+.app-claim-card.is-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.app-claim-card__title {
+  margin: 0;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.app-claim-card__open {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.app-claim-card__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.app-claim-card__open:focus-visible {
+  outline: none;
+}
+.app-claim-card__open:focus-visible::after {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.app-claim-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.app-claim-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+}
+.app-claim-card__badges > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+.app-claim-card__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: var(--border-hairline) solid var(--line);
+}
+.app-claim-card__figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.app-claim-card__figures dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.app-claim-card__figures .app-claim-card__plain {
+  font-weight: 400;
+}
+@media (max-width: 639.98px) {
+  .app-claim-cards,
+  .app-claim-cards--grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4);
+  }
+}
+
+/* Switch for a yes/no setting (payment status): a square track, the thumb position and the filled
+   track both show the state, so it never relies on color alone. */
+.app-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-md);
+  width: fit-content;
+  cursor: pointer;
+}
+.app-switch input {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  transform: translateY(-50%);
+  opacity: 0;
+  cursor: pointer;
+}
+.app-switch__track {
+  position: relative;
+  flex: none;
+  pointer-events: none; /* clicks reach the checkbox above the track */
+  width: 44px;
+  height: 24px;
+  background: var(--surface);
+  border: var(--border-hairline) solid var(--line-strong);
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+.app-switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--ink-muted);
+  transition:
+    transform 120ms ease-out,
+    background-color 120ms ease-out;
+}
+.app-switch input:checked + .app-switch__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.app-switch input:checked + .app-switch__track::after {
+  background: var(--on-accent);
+  transform: translateX(20px);
+}
+.app-switch input:focus-visible + .app-switch__track {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.app-switch__label {
+  font-size: 15px;
+  line-height: 22px;
 }

@@ -45,10 +45,12 @@ export interface ClaimItem {
   extractionStatus?: ExtractionStatus;
   extraction?: Extraction;
   // The attributes below are absent on items written before the reimbursement tracking existed.
-  // Reading them as "not submitted, not paid, no history (OPEN)" is the migration, see toClaim.
+  // Reading them as "not submitted, not paid, no history (OPEN), no documents" is the migration,
+  // see toClaim. Payment status is `paidAt`: set means the toggle "invoice paid" is on.
   submittedAt?: string | null;
   paidAt?: string | null;
   reimbursementEntries?: EntryItem[];
+  insurerDocuments?: DocumentItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -58,8 +60,12 @@ export interface DocumentItem extends InsurerDocument {
   s3Key: string; // insurer/<sub>/<claimId>/<documentId>
 }
 
-export interface EntryItem extends Omit<ReimbursementEntry, 'documents'> {
-  documents: DocumentItem[];
+/**
+ * A history entry as stored. Release 3 attached documents to entries: `documents` is only ever
+ * read from such old items (see claimDocuments) and never written again.
+ */
+export interface EntryItem extends ReimbursementEntry {
+  documents?: DocumentItem[];
 }
 
 function toEntry(item: EntryItem): ReimbursementEntry {
@@ -70,14 +76,44 @@ function toEntry(item: EntryItem): ReimbursementEntry {
     reimbursedAmount: item.reimbursedAmount,
     rejectedAmount: item.rejectedAmount,
     note: item.note,
-    documents: item.documents.map((d) => ({
-      documentId: d.documentId,
-      fileName: d.fileName,
-      contentType: d.contentType,
-      size: d.size,
-      uploadedAt: d.uploadedAt,
-    })),
     createdAt: item.createdAt,
+  };
+}
+
+function toDocument(item: DocumentItem): InsurerDocument {
+  return {
+    documentId: item.documentId,
+    fileName: item.fileName,
+    contentType: item.contentType,
+    size: item.size,
+    uploadedAt: item.uploadedAt,
+  };
+}
+
+/**
+ * All insurer documents of a claim: the claim's own list plus the ones old items still carry on
+ * their history entries. Nothing is lost on the way to the new model, and the next save moves them
+ * (see withMigratedDocuments).
+ */
+export function claimDocuments(item: Pick<ClaimItem, 'insurerDocuments' | 'reimbursementEntries'>) {
+  const all = [
+    ...(item.insurerDocuments ?? []),
+    ...(item.reimbursementEntries ?? []).flatMap((e) => e.documents ?? []),
+  ];
+  const seen = new Set<string>();
+  return all
+    .filter((d) => !seen.has(d.documentId) && seen.add(d.documentId))
+    .sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt));
+}
+
+/** The item as it is written back: documents on the claim, none left on the history entries. */
+export function withMigratedDocuments(item: ClaimItem): ClaimItem {
+  return {
+    ...item,
+    insurerDocuments: claimDocuments(item),
+    reimbursementEntries: (item.reimbursementEntries ?? []).map(
+      ({ documents: _legacy, ...entry }) => entry,
+    ),
   };
 }
 
@@ -109,6 +145,7 @@ export function toClaim(item: ClaimItem): Claim {
     submittedAt: item.submittedAt ?? null,
     paidAt: item.paidAt ?? null,
     reimbursement: toReimbursement(item),
+    documents: claimDocuments(item).map(toDocument),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };

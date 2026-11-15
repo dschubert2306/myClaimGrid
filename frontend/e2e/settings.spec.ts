@@ -75,23 +75,21 @@ test.describe('settings', () => {
     await expect(page.getByText('2026-03-12, 2:30 pm')).toBeVisible();
 
     await page.getByRole('button', { name: 'Zurück zu den Rechnungen' }).click();
-    await expect(page.getByRole('cell', { name: '2026-03-12' })).toBeVisible();
+    await expect(page.locator('article').getByText('2026-03-12', { exact: true })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('cell', { name: '2026-03-12' })).toBeVisible();
+    await expect(page.locator('article').getByText('2026-03-12', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Neue Rechnung' }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Neue Rechnung' });
-    await dialog.locator('label', { hasText: 'Manuell erfassen' }).click();
     await dialog.getByLabel('Person').selectOption({ label: 'Jonas' });
-    await dialog.getByRole('button', { name: 'Weiter' }).click();
     await expect(dialog.getByLabel('Datum', { exact: true })).toHaveAttribute(
       'placeholder',
       'JJJJ-MM-TT',
     );
     await dialog.getByLabel('Datum', { exact: true }).fill('2026-04-01');
     await dialog.getByLabel('Arzt oder Klinik').fill('Praxis');
-    await dialog.getByLabel('Betrag').fill('10');
+    await dialog.getByLabel('Betrag', { exact: true }).fill('10');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(dialog).toBeHidden();
     expect(api.claims.some((c) => c.invoiceDate === '2026-04-01')).toBe(true);

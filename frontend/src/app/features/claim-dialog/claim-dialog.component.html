@@ -21,316 +21,430 @@
       </button>
     </div>
 
-    @if (!isEdit) {
-      <ol class="mcg-steps" [attr.aria-label]="'dialog.stepsLabel' | transloco">
-        @for (label of steps(); track label; let i = $index) {
-          <li
-            [class.is-done]="i < stepIndex()"
-            [attr.aria-current]="i === stepIndex() ? 'step' : null"
-          >
-            <b>{{ i + 1 }}</b>{{ label | transloco }}
-          </li>
-        }
-      </ol>
+    @if (loadingExisting()) {
+      <div class="mcg-dialog__body">
+        <mcg-progress [label]="'dialog.loading' | transloco" [percent]="null" />
+      </div>
+    } @else if (isEdit && !claim()) {
+      <div class="mcg-dialog__body">
+        <mcg-notice variant="error">{{
+          error() ?? 'errors.loadClaimFailed' | transloco
+        }}</mcg-notice>
+      </div>
+    } @else if (showPdf()) {
+      <div class="mcg-dialog__split app-dialog-scroll">
+        <div><ng-container *ngTemplateOutlet="formFields" /></div>
+        <div class="mcg-dialog__pdf">
+          <!-- An iframe, not an object: Angular creates the element before it binds the URL, and
+               Chrome blocks an <object> that starts without data under the CSP, for good. -->
+          <iframe
+            class="app-pdf"
+            data-testid="pdf-preview"
+            [src]="pdfUrl()"
+            [attr.title]="'dialog.pdfPreview' | transloco"
+          ></iframe>
+        </div>
+      </div>
+    } @else {
+      <div class="mcg-dialog__body mcg-stack app-dialog-scroll">
+        <ng-container *ngTemplateOutlet="formFields" />
+      </div>
     }
 
-    @switch (step()) {
-      @case ('choose') {
-        <div class="mcg-dialog__body mcg-stack">
-          @if (error()) {
-            <mcg-notice variant="error">{{ error()! | transloco }}</mcg-notice>
-          }
+    @if (busy() === 'uploadingDocuments' || busy() === 'saving') {
+      <div class="mcg-dialog__body" style="padding-top: 0">
+        <mcg-progress
+          [label]="
+            (busy() === 'uploadingDocuments' ? 'documents.uploading' : 'dialog.saving') | transloco
+          "
+          [percent]="busy() === 'uploadingDocuments' ? uploadPercent() : null"
+        />
+      </div>
+    }
 
-          <div class="mcg-field">
-            <div class="mcg-field__head">
-              <span class="mcg-label" id="mode-label">{{ 'dialog.mode.label' | transloco }}</span>
-            </div>
-            <div class="mcg-choice" role="radiogroup" aria-labelledby="mode-label">
-              <label [class.is-checked]="mode() === 'upload'">
-                <input
-                  type="radio"
-                  name="mode"
-                  value="upload"
-                  data-first-focus
-                  cdkFocusInitial
-                  [checked]="mode() === 'upload'"
-                  (change)="mode.set('upload')"
-                />
-                {{ 'dialog.mode.upload' | transloco }}
-                <span>{{ 'dialog.mode.uploadHint' | transloco }}</span>
-              </label>
-              <label [class.is-checked]="mode() === 'manual'">
-                <input
-                  type="radio"
-                  name="mode"
-                  value="manual"
-                  [checked]="mode() === 'manual'"
-                  (change)="mode.set('manual')"
-                />
-                {{ 'dialog.mode.manual' | transloco }}
-                <span>{{ 'dialog.mode.manualHint' | transloco }}</span>
-              </label>
-            </div>
-          </div>
-
-          <mcg-field
-            [label]="'form.person' | transloco"
-            inputId="dlg-person"
-            [error]="personError()"
-          >
-            <mcg-select
-              inputId="dlg-person"
-              [options]="personOptions()"
-              [placeholder]="'dialog.personPlaceholder' | transloco"
-              [invalid]="!!personError()"
-              [describedBy]="personError() ? 'dlg-person-error' : null"
-              [(value)]="personId"
-            />
-          </mcg-field>
-
-          @if (mode() === 'upload') {
-            <mcg-dropzone [(file)]="file" [error]="fileError()" />
-          }
-        </div>
-        <div class="mcg-dialog__foot">
-          <span class="mcg-topbar__spacer"></span>
-          <button mcg-button (click)="requestClose()">{{ 'dialog.cancel' | transloco }}</button>
-          <button mcg-button variant="primary" (click)="next()">
-            {{ (mode() === 'upload' ? 'dialog.upload' : 'dialog.next') | transloco }}
+    <div class="mcg-dialog__foot">
+      @switch (confirm()) {
+        @case ('discard') {
+          <mcg-notice class="app-grow">{{ 'dialog.confirmDiscard' | transloco }}</mcg-notice>
+          <button mcg-button (click)="confirm.set(null)">
+            {{ 'dialog.keepEditing' | transloco }}
           </button>
-        </div>
-      }
-
-      @case ('reading') {
-        <div class="mcg-dialog__body">
-          <mcg-progress
-            [label]="(phase() === 'uploading' ? 'dialog.uploading' : 'dialog.reading') | transloco"
-            [percent]="phase() === 'uploading' ? uploadPercent() : null"
-          >
-            @if (phase() === 'extracting') {
-              <mcg-status-badge status="PENDING" />
-            }
-          </mcg-progress>
-        </div>
-        <div class="mcg-dialog__foot">
-          <span class="mcg-topbar__spacer"></span>
-          <button mcg-button (click)="requestClose()">{{ 'dialog.cancel' | transloco }}</button>
-        </div>
-      }
-
-      @case ('review') {
-        @if (loadingExisting()) {
-          <div class="mcg-dialog__body">
-            <mcg-progress [label]="'dialog.loading' | transloco" [percent]="null" />
-          </div>
-        } @else if (isEdit && !claim()) {
-          <div class="mcg-dialog__body">
-            <mcg-notice variant="error">{{
-              error() ?? 'errors.loadClaimFailed' | transloco
-            }}</mcg-notice>
-          </div>
-        } @else if (showPdf()) {
-          <div class="mcg-dialog__split">
-            <div><ng-container *ngTemplateOutlet="formFields" /></div>
-            <div class="mcg-dialog__pdf">
-              <!-- An iframe, not an object: Angular creates the element before it binds the URL, and
-                   Chrome blocks an <object> that starts without data under the CSP, for good. -->
-              <iframe
-                class="app-pdf"
-                data-testid="pdf-preview"
-                [src]="pdfUrl()"
-                [attr.title]="'dialog.pdfPreview' | transloco"
-              ></iframe>
-            </div>
-          </div>
-        } @else {
-          <div class="mcg-dialog__body mcg-stack">
-            <ng-container *ngTemplateOutlet="formFields" />
-          </div>
+          <button mcg-button variant="danger" (click)="discardAndClose()">
+            {{ 'dialog.discardYes' | transloco }}
+          </button>
         }
-
-        @if (saving()) {
-          <div class="mcg-dialog__body" style="padding-top: 0">
-            <mcg-progress [label]="'dialog.saving' | transloco" [percent]="null" />
-          </div>
+        @case ('delete') {
+          <mcg-notice class="app-grow">{{ 'dialog.confirmDelete' | transloco }}</mcg-notice>
+          <button mcg-button (click)="confirm.set(null)">{{ 'dialog.cancel' | transloco }}</button>
+          <button mcg-button variant="danger" (click)="deleteClaim()">
+            {{ 'dialog.deleteClaim' | transloco }}
+          </button>
         }
-
-        <div class="mcg-dialog__foot">
-          @switch (confirm()) {
-            @case ('discard') {
-              <mcg-notice class="app-grow">{{ 'dialog.confirmDiscard' | transloco }}</mcg-notice>
-              <button mcg-button (click)="confirm.set(null)">
-                {{ 'dialog.keepEditing' | transloco }}
-              </button>
-              <button mcg-button variant="danger" (click)="discardAndClose()">
-                {{ 'dialog.discardYes' | transloco }}
-              </button>
-            }
-            @case ('delete') {
-              <mcg-notice class="app-grow">{{ 'dialog.confirmDelete' | transloco }}</mcg-notice>
-              <button mcg-button (click)="confirm.set(null)">
-                {{ 'dialog.cancel' | transloco }}
-              </button>
-              <button mcg-button variant="danger" (click)="deleteClaim()">
-                {{ 'dialog.deleteClaim' | transloco }}
-              </button>
-            }
-            @default {
-              @if (isEdit) {
-                <button
-                  mcg-button
-                  variant="danger"
-                  [disabled]="!claim()"
-                  (click)="confirm.set('delete')"
-                >
-                  {{ 'dialog.delete' | transloco }}
-                </button>
-              } @else if (canGoBack()) {
-                <button mcg-button (click)="back()">{{ 'dialog.back' | transloco }}</button>
-              }
-              <span class="mcg-topbar__spacer"></span>
-              <button mcg-button (click)="requestClose()">{{ 'dialog.cancel' | transloco }}</button>
-              @if (!isEdit || claim()) {
-                <button mcg-button variant="primary" type="submit" form="claim-form">
-                  {{ 'dialog.save' | transloco }}
-                </button>
-              }
-            }
+        @default {
+          @if (isEdit) {
+            <button
+              mcg-button
+              variant="danger"
+              [disabled]="!claim() || working()"
+              (click)="confirm.set('delete')"
+            >
+              {{ 'dialog.delete' | transloco }}
+            </button>
           }
-        </div>
+          <span class="mcg-topbar__spacer"></span>
+          <button
+            mcg-button
+            [disabled]="busy() === 'saving' || busy() === 'uploadingDocuments'"
+            (click)="requestClose()"
+          >
+            {{ 'dialog.cancel' | transloco }}
+          </button>
+          @if (!isEdit || claim()) {
+            <button
+              mcg-button
+              variant="primary"
+              type="submit"
+              form="claim-form"
+              [disabled]="working()"
+            >
+              {{ 'dialog.save' | transloco }}
+            </button>
+          }
+        }
       }
-    }
+    </div>
   </div>
 </div>
 
 <ng-template #formFields>
-  @if (error() && step() === 'review') {
+  @if (error()) {
     <mcg-notice variant="error">{{ error()! | transloco }}</mcg-notice>
   }
   @if (extractionFailed()) {
     <mcg-notice variant="error">{{ 'dialog.extractionFailed' | transloco }}</mcg-notice>
   }
-  <div class="mcg-row" style="justify-content: space-between">
-    <span class="mcg-label">{{ 'dialog.for' | transloco: { name: personName() } }}</span>
-    @if (claim()?.extractionStatus; as extraction) {
-      @if (!isEdit) {
-        <mcg-status-badge [status]="extraction" />
-      }
-    }
-  </div>
 
-  <form class="mcg-stack" id="claim-form" novalidate [formGroup]="form" (ngSubmit)="save()">
-    <mcg-field
-      [label]="'form.provider' | transloco"
-      inputId="f-provider"
-      [tag]="tagFor('provider')"
-      [error]="errorText('provider')"
-    >
-      <input
-        id="f-provider"
-        class="mcg-input"
-        formControlName="provider"
-        autocomplete="off"
-        maxlength="200"
-        data-first-focus
-        [attr.aria-invalid]="errorText('provider') ? true : null"
-        [attr.aria-describedby]="describedBy('provider')"
-      />
-    </mcg-field>
-
-    <mcg-field
-      [label]="'form.invoiceNumber' | transloco"
-      inputId="f-invoiceNumber"
-      [tag]="tagFor('invoiceNumber')"
-      [error]="errorText('invoiceNumber')"
-    >
-      <input
-        id="f-invoiceNumber"
-        class="mcg-input mcg-mono"
-        formControlName="invoiceNumber"
-        autocomplete="off"
-        maxlength="100"
-        [placeholder]="'form.invoiceNumberPlaceholder' | transloco"
-        [attr.aria-invalid]="errorText('invoiceNumber') ? true : null"
-        [attr.aria-describedby]="describedBy('invoiceNumber')"
-      />
-    </mcg-field>
-
-    <div class="mcg-fields-2">
-      <mcg-field
-        [label]="'form.invoiceDate' | transloco"
-        inputId="f-invoiceDate"
-        [tag]="tagFor('invoiceDate')"
-        [error]="errorText('invoiceDate')"
-      >
-        <mcg-date-input
-          inputId="f-invoiceDate"
-          formControlName="invoiceDate"
-          [invalid]="!!errorText('invoiceDate')"
-          [describedBy]="describedBy('invoiceDate')"
-          (blurred)="normalize('invoiceDate')"
+  @if (!isEdit) {
+    <!-- A new claim: the person, and optionally the invoice PDF the fields are read from. -->
+    @if (claim()) {
+      <div class="mcg-row" style="justify-content: space-between">
+        <span class="mcg-label">{{ 'dialog.for' | transloco: { name: personName() } }}</span>
+        @if (claim()?.extractionStatus; as extraction) {
+          <mcg-status-badge [status]="extraction" />
+        }
+      </div>
+    } @else {
+      <mcg-field [label]="'form.person' | transloco" inputId="dlg-person" [error]="personError()">
+        <mcg-select
+          inputId="dlg-person"
+          [options]="personOptions()"
+          [placeholder]="'dialog.personPlaceholder' | transloco"
+          [invalid]="!!personError()"
+          [describedBy]="personError() ? 'dlg-person-error' : null"
+          [(value)]="personId"
         />
       </mcg-field>
-      <mcg-field
-        [label]="'form.amount' | transloco"
-        inputId="f-amount"
-        [tag]="tagFor('amount')"
-        [error]="errorText('amount')"
-      >
-        <div class="mcg-input-wrap">
-          <input
-            id="f-amount"
-            class="mcg-input mcg-input--amount"
-            formControlName="amount"
-            autocomplete="off"
-            inputmode="decimal"
-            [attr.aria-invalid]="errorText('amount') ? true : null"
-            [attr.aria-describedby]="describedBy('amount')"
-            (blur)="normalize('amount')"
-          />
-          <span class="mcg-input-suffix" aria-hidden="true">€</span>
+      @if (readingInvoice()) {
+        <mcg-progress
+          [label]="
+            (busy() === 'uploadingInvoice' ? 'dialog.uploading' : 'dialog.reading') | transloco
+          "
+          [percent]="busy() === 'uploadingInvoice' ? uploadPercent() : null"
+        >
+          @if (busy() === 'extracting') {
+            <mcg-status-badge status="PENDING" />
+          }
+        </mcg-progress>
+      } @else {
+        <div class="mcg-field">
+          <div class="mcg-field__head">
+            <span class="mcg-label">{{ 'dialog.invoicePdf' | transloco }}</span>
+          </div>
+          <mcg-dropzone (fileChange)="onInvoiceFile($event)" />
+          <span class="mcg-field__hint">{{ 'dialog.invoicePdfHint' | transloco }}</span>
         </div>
-      </mcg-field>
+      }
+    }
+  } @else {
+    <div class="mcg-row" style="justify-content: space-between">
+      <span class="mcg-label">{{ 'dialog.for' | transloco: { name: personName() } }}</span>
     </div>
+  }
 
-    <mcg-field
-      [label]="'form.description' | transloco"
-      inputId="f-description"
-      [error]="errorText('description')"
-    >
-      <textarea
-        id="f-description"
-        class="mcg-input"
-        formControlName="description"
-        maxlength="500"
-        [placeholder]="'form.descriptionPlaceholder' | transloco"
-        [attr.aria-invalid]="errorText('description') ? true : null"
-        [attr.aria-describedby]="describedBy('description')"
-      ></textarea>
-    </mcg-field>
+  <form class="mcg-stack" id="claim-form" novalidate [formGroup]="form" (ngSubmit)="save()">
+    <!-- Invoice -->
+    <div class="app-fieldset" role="group" aria-labelledby="invoice-title">
+      <h3 class="app-section-title" id="invoice-title">{{ 'dialog.invoice' | transloco }}</h3>
+      <mcg-field
+        [label]="'form.provider' | transloco"
+        inputId="f-provider"
+        [tag]="tagFor('provider')"
+        [error]="errorText('provider')"
+      >
+        <input
+          id="f-provider"
+          class="mcg-input"
+          formControlName="provider"
+          autocomplete="off"
+          maxlength="200"
+          data-first-focus
+          [attr.aria-invalid]="errorText('provider') ? true : null"
+          [attr.aria-describedby]="describedBy('provider')"
+        />
+      </mcg-field>
 
-    <!-- Submission and self-payment: two independent dates, saved with the claim. -->
-    <fieldset class="app-fieldset">
-      <legend class="app-section-title">{{ 'tracking.title' | transloco }}</legend>
+      <mcg-field
+        [label]="'form.invoiceNumber' | transloco"
+        inputId="f-invoiceNumber"
+        [tag]="tagFor('invoiceNumber')"
+        [error]="errorText('invoiceNumber')"
+      >
+        <input
+          id="f-invoiceNumber"
+          class="mcg-input mcg-mono"
+          formControlName="invoiceNumber"
+          autocomplete="off"
+          maxlength="100"
+          [placeholder]="'form.invoiceNumberPlaceholder' | transloco"
+          [attr.aria-invalid]="errorText('invoiceNumber') ? true : null"
+          [attr.aria-describedby]="describedBy('invoiceNumber')"
+        />
+      </mcg-field>
+
       <div class="mcg-fields-2">
         <mcg-field
-          [label]="'tracking.submittedAt' | transloco"
-          inputId="f-submittedAt"
-          [hint]="'tracking.submittedHint' | transloco"
-          [error]="errorText('submittedAt')"
+          [label]="'form.invoiceDate' | transloco"
+          inputId="f-invoiceDate"
+          [tag]="tagFor('invoiceDate')"
+          [error]="errorText('invoiceDate')"
         >
           <mcg-date-input
-            inputId="f-submittedAt"
-            formControlName="submittedAt"
-            [invalid]="!!errorText('submittedAt')"
-            [describedBy]="describedBy('submittedAt')"
-            (blurred)="normalize('submittedAt')"
+            inputId="f-invoiceDate"
+            formControlName="invoiceDate"
+            [invalid]="!!errorText('invoiceDate')"
+            [describedBy]="describedBy('invoiceDate')"
+            (blurred)="normalize('invoiceDate')"
           />
         </mcg-field>
         <mcg-field
-          [label]="'tracking.paidAt' | transloco"
+          [label]="'form.amount' | transloco"
+          inputId="f-amount"
+          [tag]="tagFor('amount')"
+          [error]="errorText('amount')"
+        >
+          <div class="mcg-input-wrap">
+            <input
+              id="f-amount"
+              class="mcg-input mcg-input--amount"
+              formControlName="amount"
+              autocomplete="off"
+              inputmode="decimal"
+              [attr.aria-invalid]="errorText('amount') ? true : null"
+              [attr.aria-describedby]="describedBy('amount')"
+              (blur)="normalize('amount')"
+            />
+            <span class="mcg-input-suffix" aria-hidden="true">€</span>
+          </div>
+        </mcg-field>
+      </div>
+
+      <mcg-field
+        [label]="'form.description' | transloco"
+        inputId="f-description"
+        [error]="errorText('description')"
+      >
+        <textarea
+          id="f-description"
+          class="mcg-input"
+          formControlName="description"
+          maxlength="500"
+          [placeholder]="'form.descriptionPlaceholder' | transloco"
+          [attr.aria-invalid]="errorText('description') ? true : null"
+          [attr.aria-describedby]="describedBy('description')"
+        ></textarea>
+      </mcg-field>
+    </div>
+
+    <!-- Reimbursement: the insurer side. Saving a change adds one entry to the history. -->
+    <div
+      class="app-fieldset app-fieldset--divided"
+      role="group"
+      aria-labelledby="reimbursement-title"
+    >
+      <h3 class="app-section-title" id="reimbursement-title">
+        {{ 'reimbursement.section' | transloco }}
+      </h3>
+      <mcg-field
+        [label]="'reimbursement.submittedAt' | transloco"
+        inputId="f-submittedAt"
+        [hint]="'reimbursement.submittedHint' | transloco"
+        [error]="errorText('submittedAt')"
+      >
+        <mcg-date-input
+          inputId="f-submittedAt"
+          formControlName="submittedAt"
+          [invalid]="!!errorText('submittedAt')"
+          [describedBy]="describedBy('submittedAt')"
+          (blurred)="normalize('submittedAt')"
+        />
+      </mcg-field>
+
+      <div class="mcg-fields-2">
+        <mcg-field
+          [label]="'reimbursement.statusLabel' | transloco"
+          inputId="f-status"
+          [error]="errorText('status')"
+        >
+          <span class="mcg-select app-select--full">
+            <select id="f-status" formControlName="status" (change)="onStatusChanged()">
+              @for (status of statuses; track status) {
+                <option [value]="status">{{ 'reimbursement.status.' + status | transloco }}</option>
+              }
+            </select>
+          </span>
+        </mcg-field>
+        @if (details()) {
+          <mcg-field
+            [label]="'reimbursement.date' | transloco"
+            inputId="f-reimbursementDate"
+            [error]="errorText('reimbursementDate')"
+          >
+            <mcg-date-input
+              inputId="f-reimbursementDate"
+              formControlName="reimbursementDate"
+              [invalid]="!!errorText('reimbursementDate')"
+              [describedBy]="describedBy('reimbursementDate')"
+              (blurred)="normalize('reimbursementDate')"
+            />
+          </mcg-field>
+        }
+      </div>
+
+      @if (pays()) {
+        <div class="mcg-fields-2">
+          <mcg-field
+            [label]="'reimbursement.reimbursedAmount' | transloco"
+            inputId="f-reimbursedAmount"
+            [hint]="'reimbursement.reimbursedHint' | transloco"
+            [error]="errorText('reimbursedAmount')"
+          >
+            <div class="mcg-input-wrap">
+              <input
+                id="f-reimbursedAmount"
+                class="mcg-input mcg-input--amount"
+                formControlName="reimbursedAmount"
+                autocomplete="off"
+                inputmode="decimal"
+                [attr.aria-invalid]="errorText('reimbursedAmount') ? true : null"
+                [attr.aria-describedby]="describedBy('reimbursedAmount')"
+                (input)="followReimbursement()"
+              />
+              <span class="mcg-input-suffix" aria-hidden="true">€</span>
+            </div>
+          </mcg-field>
+          <mcg-field
+            [label]="'reimbursement.rejectedAmount' | transloco"
+            inputId="f-rejectedAmount"
+            [hint]="'reimbursement.rejectedHint' | transloco"
+            [error]="errorText('rejectedAmount')"
+          >
+            <div class="mcg-input-wrap">
+              <input
+                id="f-rejectedAmount"
+                class="mcg-input mcg-input--amount"
+                formControlName="rejectedAmount"
+                autocomplete="off"
+                inputmode="decimal"
+                [attr.aria-invalid]="errorText('rejectedAmount') ? true : null"
+                [attr.aria-describedby]="describedBy('rejectedAmount')"
+                (input)="followReimbursement()"
+              />
+              <span class="mcg-input-suffix" aria-hidden="true">€</span>
+            </div>
+          </mcg-field>
+        </div>
+        @if (preview(); as p) {
+          <p class="mcg-field__hint" style="margin: 0" data-testid="reimbursement-preview">
+            {{
+              'reimbursement.preview'
+                | transloco
+                  : {
+                      reimbursed: (p.reimbursed | mcgCurrency),
+                      amount: (p.amount | mcgCurrency),
+                      difference: (p.difference | mcgCurrency),
+                    }
+            }}
+          </p>
+        }
+      }
+
+      @if (details()) {
+        <mcg-field
+          [label]="'reimbursement.note' | transloco"
+          inputId="f-note"
+          [error]="errorText('note')"
+        >
+          <textarea
+            id="f-note"
+            class="mcg-input"
+            formControlName="note"
+            maxlength="500"
+            [placeholder]="'reimbursement.notePlaceholder' | transloco"
+            [attr.aria-invalid]="errorText('note') ? true : null"
+            [attr.aria-describedby]="describedBy('note')"
+          ></textarea>
+        </mcg-field>
+      }
+
+      <!-- The history is the record of the saves above: a plain list, nothing to manage. -->
+      <div class="mcg-stack" style="gap: var(--space-2)">
+        <span class="mcg-label">{{ 'reimbursement.history' | transloco }}</span>
+        @if (history().length === 0) {
+          <p class="mcg-muted app-small" style="margin: 0">
+            {{ 'reimbursement.empty' | transloco }}
+          </p>
+        } @else {
+          <ol class="app-history" data-testid="history">
+            @for (entry of history(); track entry.entryId) {
+              <li class="app-history__item">
+                <div class="app-history__row">
+                  <span class="mcg-num app-small">{{ entry.date | mcgDate }}</span>
+                  <mcg-reimbursement-badge [status]="entry.status" />
+                  @if (entry.reimbursedAmount) {
+                    <span class="mcg-num app-small">{{
+                      'reimbursement.entryReimbursed'
+                        | transloco: { amount: (entry.reimbursedAmount | mcgCurrency) }
+                    }}</span>
+                  }
+                  @if (entry.rejectedAmount) {
+                    <span class="mcg-num app-small mcg-muted">{{
+                      'reimbursement.entryRejected'
+                        | transloco: { amount: (entry.rejectedAmount | mcgCurrency) }
+                    }}</span>
+                  }
+                </div>
+                @if (entry.note) {
+                  <p class="app-history__note mcg-muted app-small">{{ entry.note }}</p>
+                }
+              </li>
+            }
+          </ol>
+        }
+      </div>
+    </div>
+
+    <!-- Payment: my side. Independent of the reimbursement above. -->
+    <div class="app-fieldset app-fieldset--divided" role="group" aria-labelledby="payment-title">
+      <h3 class="app-section-title" id="payment-title">{{ 'payment.title' | transloco }}</h3>
+      <label class="app-switch">
+        <input type="checkbox" role="switch" formControlName="paid" (change)="onPaidToggled()" />
+        <span class="app-switch__track" aria-hidden="true"></span>
+        <span class="app-switch__label">{{ 'payment.toggle' | transloco }}</span>
+      </label>
+      @if (values().paid) {
+        <mcg-field
+          [label]="'payment.date' | transloco"
           inputId="f-paidAt"
-          [hint]="'tracking.paidHint' | transloco"
           [error]="errorText('paidAt')"
         >
           <mcg-date-input
@@ -341,12 +455,19 @@
             (blurred)="normalize('paidAt')"
           />
         </mcg-field>
-      </div>
-    </fieldset>
+      }
+    </div>
   </form>
 
-  <!-- Outside the claim form: the entry dialog has a form of its own. -->
-  @if (showReimbursement()) {
-    <mcg-reimbursement-section [claim]="claim()!" (changed)="onHistoryChanged($event)" />
-  }
+  <!-- Insurer documents: uploaded and removed here, applied with the one save. -->
+  <div class="app-fieldset app-fieldset--divided" role="group" aria-labelledby="documents-title">
+    <h3 class="app-section-title" id="documents-title">{{ 'documents.title' | transloco }}</h3>
+    <mcg-document-picker
+      [existing]="documents()"
+      [(files)]="files"
+      [disabled]="working()"
+      (openDocument)="openDocument($event)"
+      (removeExisting)="removeStored($event)"
+    />
+  </div>
 </ng-template>

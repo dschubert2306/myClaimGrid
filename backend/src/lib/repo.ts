@@ -7,19 +7,11 @@ import {
   TransactWriteCommand,
   type QueryCommandInput,
 } from '@aws-sdk/lib-dynamodb';
-import type { ClaimFields, PersonColor } from '@myclaimgrid/shared';
+import type { PersonColor } from '@myclaimgrid/shared';
 import { ddb } from './aws';
 import { GSI_BY_CLAIM_ID, config } from './config';
-import { type ClaimItem, type EntryItem, type PersonItem, yearOf } from './items';
-import {
-  ALL_YEARS_RANGE,
-  claimGsiKey,
-  datedSk,
-  personPk,
-  personSk,
-  userPk,
-  yearRange,
-} from './keys';
+import type { ClaimItem, PersonItem } from './items';
+import { ALL_YEARS_RANGE, claimGsiKey, personPk, personSk, userPk, yearRange } from './keys';
 
 const DEFAULT_COLORS: PersonColor[] = ['person-1', 'person-2', 'person-3'];
 
@@ -142,83 +134,40 @@ export async function createClaim(item: ClaimItem): Promise<void> {
 }
 
 /**
- * Stores the corrected fields and sets the status to OPEN. A draft has no invoice date and
- * therefore a different sort key, so the item is moved in one transaction. The same happens
- * when the invoice date changes later.
+ * Writes the saved claim over `existing`. Optimistic locking on `updatedAt`: if the claim changed
+ * since it was read (another tab, the extraction result of a draft), the write fails with a
+ * conflict. A draft has no invoice date and therefore a different sort key, so the item moves in
+ * one transaction. The same happens when the invoice date changes later.
  */
-export async function saveClaim(existing: ClaimItem, fields: ClaimFields): Promise<ClaimItem> {
-  const updated: ClaimItem = {
-    ...existing,
-    sk: datedSk(fields.invoiceDate, existing.claimId),
-    status: 'OPEN',
-    year: yearOf(fields.invoiceDate),
-    provider: fields.provider,
-    invoiceNumber: fields.invoiceNumber,
-    invoiceDate: fields.invoiceDate,
-    amount: fields.amount,
-    description: fields.description,
-    // Absent in the request means "keep", null clears the date.
-    submittedAt:
-      fields.submittedAt === undefined ? (existing.submittedAt ?? null) : fields.submittedAt,
-    paidAt: fields.paidAt === undefined ? (existing.paidAt ?? null) : fields.paidAt,
-    // Results that arrive after the user saved are discarded, so do not stay PENDING.
-    extractionStatus:
-      existing.extractionStatus === 'PENDING' ? 'FAILED' : existing.extractionStatus,
-    updatedAt: nextTimestamp(existing.updatedAt),
+export async function replaceClaim(existing: ClaimItem, updated: ClaimItem): Promise<void> {
+  const unchanged = {
+    ConditionExpression: 'attribute_exists(pk) AND updatedAt = :prev',
+    ExpressionAttributeValues: { ':prev': existing.updatedAt },
   };
-
   if (updated.sk === existing.sk) {
-    await ddb.send(
-      new PutCommand({
-        TableName: config.tableName,
-        Item: updated,
-        ConditionExpression: 'attribute_exists(pk)',
-      }),
-    );
-  } else {
-    await ddb.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Delete: {
-              TableName: config.tableName,
-              Key: { pk: existing.pk, sk: existing.sk },
-              ConditionExpression: 'attribute_exists(pk)',
-            },
-          },
-          {
-            Put: {
-              TableName: config.tableName,
-              Item: updated,
-              ConditionExpression: 'attribute_not_exists(pk)',
-            },
-          },
-        ],
-      }),
-    );
+    await ddb.send(new PutCommand({ TableName: config.tableName, Item: updated, ...unchanged }));
+    return;
   }
-  return updated;
-}
-
-/**
- * Replaces the reimbursement history. Optimistic locking on `updatedAt`: if the claim changed since
- * it was read (another tab, a save that moved it to a new sort key), the write fails with a conflict.
- */
-export async function saveEntries(existing: ClaimItem, entries: EntryItem[]): Promise<ClaimItem> {
-  const updated: ClaimItem = {
-    ...existing,
-    reimbursementEntries: entries,
-    updatedAt: nextTimestamp(existing.updatedAt),
-  };
   await ddb.send(
-    new PutCommand({
-      TableName: config.tableName,
-      Item: updated,
-      ConditionExpression: 'attribute_exists(pk) AND updatedAt = :prev',
-      ExpressionAttributeValues: { ':prev': existing.updatedAt },
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Delete: {
+            TableName: config.tableName,
+            Key: { pk: existing.pk, sk: existing.sk },
+            ...unchanged,
+          },
+        },
+        {
+          Put: {
+            TableName: config.tableName,
+            Item: updated,
+            ConditionExpression: 'attribute_not_exists(pk)',
+          },
+        },
+      ],
     }),
   );
-  return updated;
 }
 
 export async function deleteClaim(item: ClaimItem): Promise<void> {

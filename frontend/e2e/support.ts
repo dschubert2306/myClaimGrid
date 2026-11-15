@@ -1,9 +1,11 @@
 import type { Page, Route } from '@playwright/test';
 import {
-  checkNewEntry,
-  createEntryRequestSchema,
+  createClaimRequestSchema,
+  planReimbursementChange,
   reimbursementTotals,
+  saveClaimRequestSchema,
   sortEntries,
+  type InsurerDocument,
   type ReimbursementEntry,
 } from '@myclaimgrid/shared';
 
@@ -49,6 +51,7 @@ export interface MockClaim {
   paidAt: string | null;
   /** History as the API returns it, the totals are derived on every response. */
   entries: ReimbursementEntry[];
+  documents: InsurerDocument[];
   createdAt: string;
   updatedAt: string;
 }
@@ -60,7 +63,7 @@ export interface MockApi {
   /** What the extraction "reads" from the next uploaded PDF. */
   extraction: 'DONE' | 'FAILED';
   uploadedFiles: number;
-  /** Upload ids handed out by POST /claims/{id}/documents, per claim. */
+  /** Uploads handed out by POST /document-uploads: upload id -> content type. */
   stagedUploads: Map<string, string>;
   /** Documents that were opened through a signed link. */
   openedDocuments: string[];
@@ -113,10 +116,58 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
       submittedAt: null,
       paidAt: null,
       entries: [],
+      documents: [],
       createdAt: now,
       updatedAt: now,
       ...partial,
     });
+  }
+
+  /**
+   * What the real API does with one save: the reimbursement change against the history (one entry),
+   * the documents, then the claim itself. Returns an error code, or null when it was saved.
+   */
+  function applySave(
+    claim: MockClaim,
+    save:
+      | ReturnType<typeof saveClaimRequestSchema.parse>
+      | ReturnType<typeof createClaimRequestSchema.parse>,
+  ): string | null {
+    const plan = planReimbursementChange(save.amount, claim.entries, save.reimbursement);
+    if (!plan.ok) return plan.problem;
+    if (save.removedDocumentIds.some((id) => !claim.documents.some((d) => d.documentId === id))) {
+      return 'document_not_found';
+    }
+    if (save.newDocuments.some((d) => !api.stagedUploads.has(d.uploadId))) return 'upload_missing';
+
+    const stamp = new Date(Date.now() + ++counter).toISOString();
+    if (plan.entry) {
+      claim.entries.push({ entryId: newId(), ...plan.entry, createdAt: stamp });
+    }
+    claim.documents = [
+      ...claim.documents.filter((d) => !save.removedDocumentIds.includes(d.documentId)),
+      ...save.newDocuments.map((d) => ({
+        documentId: d.uploadId,
+        fileName: d.fileName,
+        contentType: api.stagedUploads.get(d.uploadId) as InsurerDocument['contentType'],
+        size: 1000,
+        uploadedAt: stamp,
+      })),
+    ];
+    Object.assign(claim, {
+      status: 'OPEN',
+      year: Number(save.invoiceDate.slice(0, 4)),
+      provider: save.provider,
+      invoiceNumber: save.invoiceNumber,
+      invoiceDate: save.invoiceDate,
+      amount: save.amount,
+      description: save.description,
+      submittedAt: save.submittedAt,
+      paidAt: save.paid ? save.paidAt : null,
+      extractionStatus: claim.extractionStatus === 'PENDING' ? 'FAILED' : claim.extractionStatus,
+      updatedAt: stamp,
+    });
+    return null;
   }
 
   await page.route('**/config.json', (route) =>
@@ -220,6 +271,7 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
         submittedAt: null,
         paidAt: null,
         entries: [],
+        documents: [],
         createdAt: now,
         updatedAt: now,
       };
@@ -237,111 +289,63 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
       );
     }
 
+    if (method === 'POST' && path === '/document-uploads') {
+      const uploadId = newId();
+      api.stagedUploads.set(uploadId, body.contentType);
+      return json(
+        route,
+        {
+          uploadId,
+          upload: {
+            url: 'http://localhost:4300/mock-s3',
+            fields: { key: `incoming/u/${uploadId}`, 'Content-Type': body.contentType },
+          },
+        },
+        201,
+      );
+    }
+
     if (method === 'POST' && path === '/claims') {
+      const parsed = createClaimRequestSchema.safeParse(body);
+      if (!parsed.success) return json(route, { error: { code: 'validation_failed' } }, 400);
       const claim: MockClaim = {
         claimId: newId(),
-        personId: body.personId,
+        personId: parsed.data.personId,
         status: 'OPEN',
         source: 'MANUAL',
-        year: Number(body.invoiceDate.slice(0, 4)),
-        provider: body.provider,
-        invoiceNumber: body.invoiceNumber,
-        invoiceDate: body.invoiceDate,
-        amount: body.amount,
+        year: null,
+        provider: null,
+        invoiceNumber: null,
+        invoiceDate: null,
+        amount: null,
         currency: 'EUR',
-        description: body.description,
+        description: null,
         hasPdf: false,
         extractionStatus: null,
         extraction: null,
-        submittedAt: body.submittedAt ?? null,
-        paidAt: body.paidAt ?? null,
+        submittedAt: null,
+        paidAt: null,
         entries: [],
+        documents: [],
         createdAt: now,
         updatedAt: now,
       };
+      const error = applySave(claim, parsed.data);
+      if (error) return json(route, { error: { code: error } }, 400);
       api.claims.push(claim);
       return json(route, toApi(claim), 201);
     }
 
-    // ------------------------------------------------------------ reimbursement
-    const sub = /^\/claims\/([^/]+)\/(documents|entries)(?:\/([^/]+))?(\/url)?$/.exec(path);
-    if (sub) {
-      const owner = api.claims.find((c) => c.claimId === sub[1]);
-      if (!owner) return json(route, { error: { code: 'not_found' } }, 404);
-      const [, , kind, itemId, isUrl] = sub;
-
-      if (method === 'POST' && kind === 'documents' && !itemId) {
-        const uploadId = newId();
-        api.stagedUploads.set(uploadId, owner.claimId);
-        return json(
-          route,
-          {
-            uploadId,
-            upload: {
-              url: 'http://localhost:4300/mock-s3',
-              fields: {
-                key: `incoming/u/${owner.claimId}/${uploadId}`,
-                'Content-Type': body.contentType,
-              },
-            },
-          },
-          201,
-        );
+    const documentUrl = /^\/claims\/([^/]+)\/documents\/([^/]+)\/url$/.exec(path);
+    if (method === 'GET' && documentUrl) {
+      const owner = api.claims.find((c) => c.claimId === documentUrl[1]);
+      if (!owner?.documents.some((d) => d.documentId === documentUrl[2])) {
+        return json(route, { error: { code: 'document_not_found' } }, 404);
       }
-
-      if (method === 'POST' && kind === 'entries' && !itemId) {
-        const parsed = createEntryRequestSchema.safeParse(body);
-        if (!parsed.success) return json(route, { error: { code: 'validation_failed' } }, 400);
-        const entry = parsed.data;
-        const amounts = {
-          reimbursedAmount: entry.reimbursedAmount ?? null,
-          rejectedAmount: entry.rejectedAmount ?? null,
-        };
-        if (checkNewEntry(owner.amount ?? 0, owner.entries, amounts)) {
-          return json(route, { error: { code: 'amount_above_invoice' } }, 400);
-        }
-        if (entry.documents.some((d) => api.stagedUploads.get(d.uploadId) !== owner.claimId)) {
-          return json(route, { error: { code: 'upload_missing' } }, 400);
-        }
-        owner.entries.push({
-          entryId: newId(),
-          status: entry.status,
-          date: entry.date,
-          ...amounts,
-          note: entry.note,
-          documents: entry.documents.map((d) => ({
-            documentId: d.uploadId,
-            fileName: d.fileName,
-            contentType: 'application/pdf',
-            size: 1000,
-            uploadedAt: now,
-          })),
-          createdAt: new Date().toISOString(),
-        });
-        return json(route, toApi(owner), 201);
-      }
-
-      if (method === 'DELETE' && kind === 'entries' && itemId) {
-        owner.entries = owner.entries.filter((e) => e.entryId !== itemId);
-        return json(route, toApi(owner));
-      }
-
-      if (kind === 'documents' && itemId) {
-        const has = owner.entries.some((e) => e.documents.some((d) => d.documentId === itemId));
-        if (!has) return json(route, { error: { code: 'document_not_found' } }, 404);
-        if (method === 'GET' && isUrl) {
-          return json(route, {
-            url: `http://localhost:4300/mock-document.pdf?doc=${itemId}`,
-            expiresIn: 60,
-          });
-        }
-        if (method === 'DELETE' && !isUrl) {
-          for (const e of owner.entries)
-            e.documents = e.documents.filter((d) => d.documentId !== itemId);
-          return json(route, toApi(owner));
-        }
-      }
-      return json(route, { error: { code: 'not_found' } }, 404);
+      return json(route, {
+        url: `http://localhost:4300/mock-document.pdf?doc=${documentUrl[2]}`,
+        expiresIn: 60,
+      });
     }
 
     const single = /^\/claims\/([^/]+)$/.exec(path);
@@ -374,18 +378,13 @@ export async function mockBackend(page: Page, seed: Partial<MockClaim>[] = []): 
     }
 
     if (method === 'PUT' && claim) {
-      Object.assign(claim, {
-        status: 'OPEN',
-        year: Number(body.invoiceDate.slice(0, 4)),
-        provider: body.provider,
-        invoiceNumber: body.invoiceNumber,
-        invoiceDate: body.invoiceDate,
-        amount: body.amount,
-        description: body.description,
-        extractionStatus: claim.extractionStatus === 'PENDING' ? 'FAILED' : claim.extractionStatus,
-        ...(body.submittedAt !== undefined ? { submittedAt: body.submittedAt } : {}),
-        ...(body.paidAt !== undefined ? { paidAt: body.paidAt } : {}),
-      });
+      const parsed = saveClaimRequestSchema.safeParse(body);
+      if (!parsed.success) return json(route, { error: { code: 'validation_failed' } }, 400);
+      if (parsed.data.version !== claim.updatedAt) {
+        return json(route, { error: { code: 'conflict' } }, 409);
+      }
+      const error = applySave(claim, parsed.data);
+      if (error) return json(route, { error: { code: error } }, 400);
       return json(route, toApi(claim));
     }
 

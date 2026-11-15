@@ -4,17 +4,16 @@ import type {
   Claim,
   ClaimDetail,
   ClaimsResponse,
+  CreateClaimRequestInput,
   CreateDocumentUploadRequest,
   CreateDocumentUploadResponse,
-  CreateEntryRequestInput,
-  CreateManualClaimRequest,
   CreateUploadResponse,
   DashboardResponse,
   DocumentUrlResponse,
   Person,
   PersonsResponse,
   RenamePersonRequest,
-  SaveClaimRequest,
+  SaveClaimRequestInput,
 } from '@myclaimgrid/shared';
 import { filter, map, switchMap, type Observable } from 'rxjs';
 import { ConfigService } from './config.service';
@@ -63,11 +62,11 @@ export class ApiClient {
     );
   }
 
-  createClaim(body: CreateManualClaimRequest): Observable<Claim> {
+  createClaim(body: CreateClaimRequestInput): Observable<Claim> {
     return this.url('/claims').pipe(switchMap((url) => this.http.post<Claim>(url, body)));
   }
 
-  saveClaim(claimId: string, body: SaveClaimRequest): Observable<Claim> {
+  saveClaim(claimId: string, body: SaveClaimRequestInput): Observable<Claim> {
     return this.url(`/claims/${claimId}`).pipe(switchMap((url) => this.http.put<Claim>(url, body)));
   }
 
@@ -75,33 +74,14 @@ export class ApiClient {
     return this.url(`/claims/${claimId}`).pipe(switchMap((url) => this.http.delete<void>(url)));
   }
 
-  // ------------------------------------------------------------ reimbursement
+  // ------------------------------------------------------------ insurer documents
 
-  /** Presigned POST for one insurer document, uploaded with `uploadToS3` before the entry is saved. */
+  /** Presigned POST for one insurer document, uploaded with `uploadToS3` before the claim is saved. */
   createDocumentUpload(
-    claimId: string,
     body: CreateDocumentUploadRequest,
   ): Observable<CreateDocumentUploadResponse> {
-    return this.url(`/claims/${claimId}/documents`).pipe(
+    return this.url('/document-uploads').pipe(
       switchMap((url) => this.http.post<CreateDocumentUploadResponse>(url, body)),
-    );
-  }
-
-  addEntry(claimId: string, body: CreateEntryRequestInput): Observable<Claim> {
-    return this.url(`/claims/${claimId}/entries`).pipe(
-      switchMap((url) => this.http.post<Claim>(url, body)),
-    );
-  }
-
-  deleteEntry(claimId: string, entryId: string): Observable<Claim> {
-    return this.url(`/claims/${claimId}/entries/${entryId}`).pipe(
-      switchMap((url) => this.http.delete<Claim>(url)),
-    );
-  }
-
-  deleteDocument(claimId: string, documentId: string): Observable<Claim> {
-    return this.url(`/claims/${claimId}/documents/${documentId}`).pipe(
-      switchMap((url) => this.http.delete<Claim>(url)),
     );
   }
 

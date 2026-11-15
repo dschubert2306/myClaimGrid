@@ -10,7 +10,15 @@ let persons: { personId: string }[];
 async function addClaim(personIndex: number, invoiceDate: string, amount: number) {
   const result = await claimsHandler(
     apiEvent('POST /claims', {
-      body: { personId: persons[personIndex]?.personId, provider: 'Praxis', invoiceDate, amount },
+      body: {
+        personId: persons[personIndex]?.personId,
+        provider: 'Praxis',
+        invoiceDate,
+        amount,
+        submittedAt: null,
+        paid: false,
+        reimbursement: { status: 'OPEN' },
+      },
     }),
   );
   expect(result.statusCode).toBe(201);

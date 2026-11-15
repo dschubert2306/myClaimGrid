@@ -15,19 +15,13 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { DashboardStore, type PersonFigures } from '../core/dashboard.store';
 import { McgCurrencyPipe } from '../core/pipes';
 import { ButtonComponent } from './button.component';
-import { ClaimTableComponent } from './claim-table.component';
+import { ClaimCardComponent } from './claim-card.component';
 import { ProgressComponent } from './progress.component';
 
-/** One dashboard column: name, total and count for the year, and the claims. */
+/** One dashboard column: name, total and count for the year, and the claims as cards. */
 @Component({
   selector: 'section[mcg-person-card]',
-  imports: [
-    TranslocoPipe,
-    McgCurrencyPipe,
-    ButtonComponent,
-    ClaimTableComponent,
-    ProgressComponent,
-  ],
+  imports: [TranslocoPipe, McgCurrencyPipe, ButtonComponent, ClaimCardComponent, ProgressComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'mcg-person', '[style.--person]': "'var(--' + person().color + ')'" },
   template: `
@@ -103,11 +97,16 @@ import { ProgressComponent } from './progress.component';
       </div>
     }
     @if (claims().length > 0) {
-      <mcg-claim-table
-        [claims]="claims()"
-        [selectedId]="selectedId()"
-        (open)="openClaim.emit($event)"
-      />
+      <div class="app-claim-cards">
+        @for (claim of claims(); track claim.claimId) {
+          <article
+            mcg-claim-card
+            [claim]="claim"
+            [selected]="claim.claimId === selectedId()"
+            (open)="openClaim.emit($event)"
+          ></article>
+        }
+      </div>
     } @else {
       <p
         class="mcg-muted"
