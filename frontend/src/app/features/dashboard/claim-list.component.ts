@@ -19,8 +19,8 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { LanguageService } from '../../core/language.service';
 import { McgCurrencyPipe } from '../../core/pipes';
 import { ButtonComponent } from '../../ui/button.component';
-import { ClaimCardComponent } from '../../ui/claim-card.component';
 import { SelectComponent } from '../../ui/select.component';
+import { ClaimTableComponent } from './claim-table.component';
 
 export interface ClaimRow {
   claim: Claim;
@@ -38,12 +38,12 @@ export class ClaimListFilters {
 }
 
 /**
- * All claims of the year as cards in a wide grid, with filters for both status dimensions and the
- * totals of what is shown. The person columns are too narrow for a grid (design-system/components/ClaimCard).
+ * All claims of the year as an editable table, with filters for both status dimensions and the
+ * totals of what is shown (design-system/components/ClaimTable).
  */
 @Component({
   selector: 'mcg-claim-list',
-  imports: [TranslocoPipe, McgCurrencyPipe, ButtonComponent, ClaimCardComponent, SelectComponent],
+  imports: [TranslocoPipe, McgCurrencyPipe, ButtonComponent, ClaimTableComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-filters" role="search" [attr.aria-label]="'dashboard.views.list' | transloco">
@@ -115,17 +115,11 @@ export class ClaimListFilters {
       } @else if (visible().length === 0) {
         <p class="app-list__empty mcg-muted">{{ 'list.empty' | transloco }}</p>
       } @else {
-        <div class="app-claim-cards app-claim-cards--grid" data-testid="claim-list">
-          @for (row of visible(); track row.claim.claimId) {
-            <article
-              mcg-claim-card
-              [claim]="row.claim"
-              [person]="row.person"
-              [selected]="row.claim.claimId === selectedId()"
-              (open)="open.emit($event)"
-            ></article>
-          }
-        </div>
+        <mcg-claim-table
+          [rows]="visible()"
+          [selectedId]="selectedId()"
+          (open)="open.emit($event)"
+        />
       }
     </div>
   `,

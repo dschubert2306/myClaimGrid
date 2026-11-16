@@ -237,7 +237,15 @@
     "count": "{{count}} von {{total}} Rechnungen",
     "empty": "Keine Rechnung passt zu den Filtern.",
     "noClaims": "Noch keine Rechnungen für {{year}}.",
-    "totals": "Summe {{amount}}, erstattet {{reimbursed}}, ausstehend {{outstanding}}"
+    "totals": "Summe {{amount}}, erstattet {{reimbursed}}, ausstehend {{outstanding}}",
+    "tableLabel": "Rechnungen",
+    "statusColumn": "Status",
+    "invoiceColumn": "Rechnung angehängt",
+    "detailsColumn": "Details",
+    "invoiceAttached": "Rechnung als PDF angehängt",
+    "openDetails": "Details öffnen",
+    "editCell": "{{column}} von {{provider}} ändern: {{value}}",
+    "emptyValue": "leer"
   },
   "payment": {
     "title": "Zahlung",
@@ -258,11 +266,6 @@
   },
   "card": {
     "invoiceAmount": "Rechnungsbetrag",
-    "reimbursed": "Erstattet",
-    "outstanding": "Ausstehend",
-    "difference": "Differenz zum Rechnungsbetrag",
-    "submitted": "Eingereicht",
-    "notYet": "Noch nicht",
     "documents": "Dokumente"
   }
 }

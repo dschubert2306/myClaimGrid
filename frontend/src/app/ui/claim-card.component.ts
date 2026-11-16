@@ -1,14 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { differenceToInvoice, type Claim, type Person } from '@myclaimgrid/shared';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import type { Claim, Person } from '@myclaimgrid/shared';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { McgCurrencyPipe, McgDatePipe } from '../core/pipes';
+import { IconComponent } from './icon.component';
 import { PaymentBadgeComponent, ReimbursementBadgeComponent } from './tracking-badges.component';
 
 /**
- * One claim with all its status fields at a glance (design-system/components/ClaimCard): the
- * reimbursement and the payment status as two separate badges, the amounts, the submission date
- * and the number of insurer documents. The provider is a real button that covers the whole card,
- * so a click anywhere opens the claim dialog and the keyboard has one tab stop per card.
+ * One claim, compact (design-system/components/ClaimCard): provider, date and invoice number, a
+ * file icon when insurer documents are attached, the reimbursement and the payment status as two
+ * separate badges and the invoice amount. The provider is a real button that covers the whole
+ * card, so a click anywhere opens the claim dialog and the keyboard has one tab stop per card.
  */
 @Component({
   selector: 'article[mcg-claim-card]',
@@ -16,6 +17,7 @@ import { PaymentBadgeComponent, ReimbursementBadgeComponent } from './tracking-b
     TranslocoPipe,
     McgCurrencyPipe,
     McgDatePipe,
+    IconComponent,
     PaymentBadgeComponent,
     ReimbursementBadgeComponent,
   ],
@@ -41,8 +43,19 @@ import { PaymentBadgeComponent, ReimbursementBadgeComponent } from './tracking-b
           p.name
         }}</span>
       }
+      @if (claim().documents.length > 0) {
+        <span
+          class="app-claim-card__docs"
+          data-testid="card-documents"
+          role="img"
+          [attr.aria-label]="('card.documents' | transloco) + ': ' + claim().documents.length"
+          [attr.title]="('card.documents' | transloco) + ': ' + claim().documents.length"
+        >
+          <mcg-icon name="file" />
+        </span>
+      }
     </p>
-    <div class="app-claim-card__badges">
+    <div class="app-claim-card__status">
       <div>
         <span class="mcg-label">{{ 'reimbursement.section' | transloco }}</span>
         <mcg-reimbursement-badge [status]="claim().reimbursement.status" />
@@ -51,55 +64,19 @@ import { PaymentBadgeComponent, ReimbursementBadgeComponent } from './tracking-b
         <span class="mcg-label">{{ 'payment.title' | transloco }}</span>
         <mcg-payment-badge [paidAt]="claim().paidAt" />
       </div>
+      <div>
+        <span class="mcg-label">{{ 'card.invoiceAmount' | transloco }}</span>
+        <span class="app-claim-card__amount" data-testid="card-amount">{{
+          claim().amount | mcgCurrency
+        }}</span>
+      </div>
     </div>
-    <dl class="app-claim-card__figures">
-      <div>
-        <dt class="mcg-label">{{ 'card.invoiceAmount' | transloco }}</dt>
-        <dd data-testid="card-amount">{{ claim().amount | mcgCurrency }}</dd>
-      </div>
-      <div>
-        <dt class="mcg-label">{{ 'card.reimbursed' | transloco }}</dt>
-        <dd data-testid="card-reimbursed">{{ claim().reimbursement.reimbursed | mcgCurrency }}</dd>
-      </div>
-      <div>
-        <dt class="mcg-label">{{ 'card.outstanding' | transloco }}</dt>
-        <dd data-testid="card-outstanding">
-          {{ claim().reimbursement.outstanding | mcgCurrency }}
-        </dd>
-      </div>
-      @if (difference() !== null) {
-        <div>
-          <dt class="mcg-label">{{ 'card.difference' | transloco }}</dt>
-          <dd data-testid="card-difference">{{ difference() | mcgCurrency }}</dd>
-        </div>
-      }
-      <div>
-        <dt class="mcg-label">{{ 'card.submitted' | transloco }}</dt>
-        <dd data-testid="card-submitted" class="app-claim-card__plain">
-          {{ claim().submittedAt ? (claim().submittedAt | mcgDate) : ('card.notYet' | transloco) }}
-        </dd>
-      </div>
-      <div>
-        <dt class="mcg-label">{{ 'card.documents' | transloco }}</dt>
-        <dd data-testid="card-documents" class="app-claim-card__plain">
-          {{ claim().documents.length }}
-        </dd>
-      </div>
-    </dl>
   `,
 })
 export class ClaimCardComponent {
   readonly claim = input.required<Claim>();
-  /** Set in the list view, where claims of all persons are mixed. */
+  /** Set where claims of several persons are mixed. */
   readonly person = input<Person | null>(null);
   readonly selected = input(false);
   readonly open = output<string>();
-
-  /** What the insurer has not paid out yet: only shown for a partial reimbursement. */
-  protected readonly difference = computed(() => {
-    const { amount, reimbursement } = this.claim();
-    return reimbursement.status === 'PARTLY_PAID' && amount !== null
-      ? differenceToInvoice(amount, reimbursement.reimbursed)
-      : null;
-  });
 }

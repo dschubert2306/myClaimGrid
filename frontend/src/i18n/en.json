@@ -237,7 +237,15 @@
     "count": "{{count}} of {{total}} claims",
     "empty": "No claim matches the filters.",
     "noClaims": "No claims for {{year}} yet.",
-    "totals": "Total {{amount}}, reimbursed {{reimbursed}}, outstanding {{outstanding}}"
+    "totals": "Total {{amount}}, reimbursed {{reimbursed}}, outstanding {{outstanding}}",
+    "tableLabel": "Claims",
+    "statusColumn": "Status",
+    "invoiceColumn": "Invoice attached",
+    "detailsColumn": "Details",
+    "invoiceAttached": "Invoice PDF attached",
+    "openDetails": "Open details",
+    "editCell": "Edit {{column}} of {{provider}}: {{value}}",
+    "emptyValue": "empty"
   },
   "payment": {
     "title": "Payment",
@@ -258,11 +266,6 @@
   },
   "card": {
     "invoiceAmount": "Invoice amount",
-    "reimbursed": "Reimbursed",
-    "outstanding": "Outstanding",
-    "difference": "Difference to the invoice amount",
-    "submitted": "Submitted",
-    "notYet": "Not yet",
     "documents": "Documents"
   }
 }

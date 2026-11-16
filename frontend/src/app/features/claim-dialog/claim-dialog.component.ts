@@ -1,6 +1,5 @@
 import { A11yModule } from '@angular/cdk/a11y';
 import { NgTemplateOutlet } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -48,6 +47,7 @@ import { LanguageService } from '../../core/language.service';
 import { McgCurrencyPipe, McgDatePipe } from '../../core/pipes';
 import { parseAmountInput, parseDateInput } from '../../core/parse-input';
 import { PreferencesService } from '../../core/preferences.service';
+import { saveErrorKey } from '../../core/save-error';
 import { ButtonComponent } from '../../ui/button.component';
 import { DateInputComponent } from '../../ui/date-input.component';
 import { DocumentPickerComponent } from '../../ui/document-picker.component';
@@ -76,18 +76,6 @@ const EXTRACTED_FIELDS = [
   'amount',
   'description',
 ] as const;
-
-/** API error codes of the save -> message keys. */
-const ERROR_KEYS: Record<string, string> = {
-  amount_above_invoice: 'errors.aboveInvoice',
-  date_required: 'errors.required',
-  date_before_latest: 'errors.dateBeforeLatest',
-  too_many_entries: 'errors.tooManyEntries',
-  too_many_documents: 'errors.tooManyDocuments',
-  invalid_document: 'errors.invalidDocument',
-  document_not_found: 'errors.conflict',
-  conflict: 'errors.conflict',
-};
 
 /**
  * The claim dialog: everything about one claim in one place, for a new claim and for an existing
@@ -498,13 +486,7 @@ export class ClaimDialogComponent implements OnDestroy {
       this.draftId = null; // saved, nothing left to discard
       this.finish('saved');
     } catch (error) {
-      const code =
-        error instanceof HttpErrorResponse
-          ? error.status === 409
-            ? 'conflict'
-            : (error.error?.error?.code as string | undefined)
-          : undefined;
-      this.error.set((code && ERROR_KEYS[code]) || 'errors.saveFailed');
+      this.error.set(saveErrorKey(error));
       this.busy.set('idle');
     }
   }

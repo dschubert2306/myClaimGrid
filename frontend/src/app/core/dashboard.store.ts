@@ -61,9 +61,31 @@ export class DashboardStore {
   }
 
   async load(): Promise<void> {
+    this.status.set('loading');
+    await this.fetch(true);
+  }
+
+  /**
+   * Reloads without leaving the "ready" state, so what is on screen (and where the focus is) stays.
+   * For changes made in place, such as the inline edits of the list. A failure keeps the old data.
+   */
+  refresh(): Promise<void> {
+    return this.fetch(false);
+  }
+
+  /** A claim that was saved in place: the list shows it at once, `refresh` then updates the totals. */
+  replaceClaim(claim: Claim): void {
+    this.claims.update((all) => ({
+      ...all,
+      [claim.personId]: (all[claim.personId] ?? []).map((c) =>
+        c.claimId === claim.claimId ? claim : c,
+      ),
+    }));
+  }
+
+  private async fetch(showError: boolean): Promise<void> {
     const id = ++this.requestId;
     const year = this.year();
-    this.status.set('loading');
     try {
       const { persons } = await firstValueFrom(this.api.persons()); // seeds the three persons on first use
       const [dashboard, claimLists] = await firstValueFrom(
@@ -80,7 +102,7 @@ export class DashboardStore {
       );
       this.status.set('ready');
     } catch {
-      if (id === this.requestId) this.status.set('error');
+      if (showError && id === this.requestId) this.status.set('error');
     }
   }
 

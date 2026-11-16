@@ -1,13 +1,13 @@
 # ClaimCard
 
-One claim with all its status fields at a glance. Used in the person columns of the overview and in the grid of the list view. Replaces the former ClaimTable.
+One claim, compact. Used in the person columns of the overview. The list view is the editable ClaimTable, which carries all the figures.
 
-Markup: `<article class="app-claim-card">` with an `<h3>` holding a real button (the provider) that is stretched over the whole card (`::after`, `inset: 0`), so a click anywhere opens the claim dialog and the keyboard has one tab stop per card. The consumer provides the claim and, in the list view, the person.
+Markup: `<article class="app-claim-card">` with an `<h3>` holding a real button (the provider) that is stretched over the whole card (`::after`, `inset: 0`), so a click anywhere opens the claim dialog and the keyboard has one tab stop per card. The consumer provides the claim and, where claims of several persons are mixed, the person.
 
-- Order: provider (title), meta line (date, invoice number, person marker in the list view), the two status badges, then the figures.
-- **Two separate badges**, each under its own label: "Erstattung" / "Reimbursement" (reimbursement status) and "Zahlung" / "Payment" (payment status with its date: "Bezahlt am 20.03.2026" / "Paid on 20/03/2026", or "Nicht bezahlt" / "Not paid"). They are never merged.
-- Figures (`dl`, labels in `mcg-label`): invoice amount, reimbursed, outstanding, the difference to the invoice amount (only for "Teilweise erstattet"), submission date ("Noch nicht" / "Not yet" while empty), number of insurer documents.
-- Amounts are tabular and formatted with the active locale. The figures grid wraps by itself (`auto-fit`, 110px minimum).
+- Order: provider (title), meta line (date, invoice number, optional person marker, file icon), then one status row.
+- Meta line: the file icon sits at the right end and only appears when insurer documents are attached. It has `role="img"` and a label with the count ("Dokumente: 2" / "Documents: 2"); the count is not shown as text.
+- Status row (wraps on narrow columns): "Erstattung" / "Reimbursement" badge, "Zahlung" / "Payment" badge (with its date: "Bezahlt am 20.03.2026" / "Paid on 20/03/2026", or "Nicht bezahlt" / "Not paid") and the invoice amount, each under its own `mcg-label`. The two badges are never merged.
+- Not on the card: reimbursed, outstanding, difference to the invoice amount, submission date. They live in the claim dialog, the ClaimTable and the person figures.
+- The amount is tabular and formatted with the active locale.
 - The open claim's card gets `aria-current="true"` and the `accent-soft` ground. Hover uses `surface-sunken`. Square corners, `line-strong` outline, tokens only, readable in both themes.
-- Person column: cards stack. List view: `repeat(auto-fill, minmax(320px, 1fr))`, one column below 640px.
-- No pagination. Volumes are small.
+- Person column: cards stack. No pagination. Volumes are small.

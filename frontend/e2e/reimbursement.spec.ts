@@ -18,13 +18,11 @@ function todayDe(): string {
   return `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`;
 }
 
-const card = (page: Page) =>
-  page.getByTestId('claim-list').locator('article', { hasText: 'Praxis Dr. Huber' });
+const row = (page: Page) =>
+  page.getByTestId('claim-list').getByRole('row', { name: /Praxis Dr\. Huber/ });
 
 async function openClaim(page: Page): Promise<Locator> {
-  await card(page)
-    .getByRole('button', { name: /Praxis Dr\. Huber/ })
-    .click();
+  await row(page).getByRole('button', { name: 'Details öffnen' }).click();
   const dialog = page.getByRole('dialog', { name: 'Rechnung bearbeiten' });
   await expect(dialog.getByLabel('Arzt oder Klinik')).toHaveValue('Praxis Dr. Huber');
   return dialog;
@@ -47,16 +45,15 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     await page.getByRole('button', { name: 'Liste' }).click();
     await expect(page).toHaveURL(/view=list/);
 
-    // The card shows every status field at a glance, two separate badges.
-    const claimCard = card(page);
-    await expect(claimCard.getByTestId('reimbursement-badge')).toHaveText('Offen');
-    await expect(claimCard.getByTestId('payment-badge')).toHaveText('Nicht bezahlt');
-    await expect(claimCard.getByTestId('card-amount')).toHaveText('100,00 €');
-    await expect(claimCard.getByTestId('card-reimbursed')).toHaveText('0,00 €');
-    await expect(claimCard.getByTestId('card-outstanding')).toHaveText('100,00 €');
-    await expect(claimCard.getByTestId('card-submitted')).toHaveText('Noch nicht');
-    await expect(claimCard.getByTestId('card-documents')).toHaveText('0');
-    await expect(claimCard.getByTestId('card-difference')).toHaveCount(0);
+    // The row shows both status fields, separately: the reimbursement and the payment.
+    const claimRow = row(page);
+    await expect(claimRow.getByTestId('reimbursement-badge')).toHaveText('Offen');
+    await expect(claimRow.getByTestId('payment-check')).not.toBeChecked();
+    await expect(claimRow).toContainText('Nicht bezahlt');
+    await expect(claimRow).toContainText('100,00 €');
+    await expect(page.getByTestId('list-totals')).toHaveText(
+      'Summe 100,00 €, erstattet 0,00 €, ausstehend 100,00 €',
+    );
 
     // 1. Submission and payment in the same dialog, saved once.
     let dialog = await openClaim(page);
@@ -79,9 +76,9 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     expect(puts()).toHaveLength(1);
     expect(api.claims[0]).toMatchObject({ submittedAt: '2026-03-14', paidAt: '2026-03-20' });
     expect(api.claims[0]!.entries).toHaveLength(0); // no reimbursement change, no history entry
-    await expect(claimCard.getByTestId('payment-badge')).toHaveText('Bezahlt am 20.03.2026');
-    await expect(claimCard.getByTestId('reimbursement-badge')).toHaveText('Offen');
-    await expect(claimCard.getByTestId('card-submitted')).toHaveText('14.03.2026');
+    await expect(claimRow.getByTestId('payment-check')).toBeChecked();
+    await expect(claimRow).toContainText('20.03.2026');
+    await expect(claimRow.getByTestId('reimbursement-badge')).toHaveText('Offen');
 
     // The combination people look for: paid, but not reimbursed yet.
     await page.getByRole('button', { name: 'Bezahlt, aber noch nicht erstattet' }).click();
@@ -89,7 +86,7 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     await expect(page.getByTestId('list-totals')).toHaveText(
       'Summe 100,00 €, erstattet 0,00 €, ausstehend 100,00 €',
     );
-    await expect(claimCard).toBeVisible();
+    await expect(claimRow).toBeVisible();
 
     // 2. Partial reimbursement with the benefit statement, in the same dialog.
     dialog = await openClaim(page);
@@ -130,13 +127,13 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     expect(api.claims[0]!.entries).toHaveLength(1);
     expect(api.claims[0]!.documents).toHaveLength(1);
 
-    // Paid and reimbursed in part: the combination stays possible, so the card is still listed.
-    await expect(claimCard.getByTestId('reimbursement-badge')).toHaveText('Teilweise erstattet');
-    await expect(claimCard.getByTestId('payment-badge')).toHaveText('Bezahlt am 20.03.2026');
-    await expect(claimCard.getByTestId('card-reimbursed')).toHaveText('60,00 €');
-    await expect(claimCard.getByTestId('card-outstanding')).toHaveText('35,00 €');
-    await expect(claimCard.getByTestId('card-difference')).toHaveText('40,00 €');
-    await expect(claimCard.getByTestId('card-documents')).toHaveText('1');
+    // Paid and reimbursed in part: the combination stays possible, so the row is still listed.
+    await expect(claimRow.getByTestId('reimbursement-badge')).toHaveText('Teilweise erstattet');
+    await expect(claimRow.getByTestId('payment-check')).toBeChecked();
+    await expect(claimRow).toContainText('20.03.2026');
+    await expect(page.getByTestId('list-totals')).toHaveText(
+      'Summe 100,00 €, erstattet 60,00 €, ausstehend 35,00 €',
+    );
 
     // 3. Reopen: the dialog shows the current state, the history and the document.
     dialog = await openClaim(page);
@@ -169,9 +166,10 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     // Closing without changes still shows the list, now filtered: paid and fully reimbursed.
     await expect(page.getByText('Keine Rechnung passt zu den Filtern.')).toBeVisible();
     await page.getByRole('button', { name: 'Filter zurücksetzen' }).click();
-    await expect(claimCard.getByTestId('reimbursement-badge')).toHaveText('Erstattet');
-    await expect(claimCard.getByTestId('card-reimbursed')).toHaveText('95,00 €');
-    await expect(claimCard.getByTestId('card-outstanding')).toHaveText('0,00 €');
+    await expect(claimRow.getByTestId('reimbursement-badge')).toHaveText('Erstattet');
+    await expect(page.getByTestId('list-totals')).toHaveText(
+      'Summe 100,00 €, erstattet 95,00 €, ausstehend 0,00 €',
+    );
 
     // History in the dialog, newest first.
     dialog = await openClaim(page);
@@ -213,7 +211,8 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(dialog).toHaveCount(0);
     expect(api.claims[0]!.paidAt).toBeNull();
-    await expect(card(page).getByTestId('payment-badge')).toHaveText('Nicht bezahlt');
+    await expect(row(page).getByTestId('payment-check')).not.toBeChecked();
+    await expect(row(page)).toContainText('Nicht bezahlt');
   });
 
   test('reimbursed without being paid by me: the two statuses are independent', async ({
@@ -226,13 +225,13 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(dialog).toHaveCount(0);
 
-    const claimCard = card(page);
-    await expect(claimCard.getByTestId('reimbursement-badge')).toHaveText('Erstattet');
-    await expect(claimCard.getByTestId('payment-badge')).toHaveText('Nicht bezahlt');
+    const claimRow = row(page);
+    await expect(claimRow.getByTestId('reimbursement-badge')).toHaveText('Erstattet');
+    await expect(claimRow.getByTestId('payment-check')).not.toBeChecked();
     // The filter for the reverse case finds it.
     await page.getByLabel('Selbst bezahlt').selectOption({ label: 'Nicht bezahlt' });
     await page.getByLabel('Erstattung', { exact: true }).selectOption({ label: 'Erstattet' });
-    await expect(claimCard).toBeVisible();
+    await expect(claimRow).toBeVisible();
   });
 
   test('documents are removed inside the dialog and deleted with the one save', async ({
@@ -249,7 +248,6 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
       },
     ];
     await page.goto('/?view=list');
-    await expect(card(page).getByTestId('card-documents')).toHaveText('1');
 
     // Removing and then cancelling changes nothing.
     let dialog = await openClaim(page);
@@ -268,7 +266,6 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(dialog).toHaveCount(0);
     expect(api.claims[0]!.documents).toHaveLength(0);
-    await expect(card(page).getByTestId('card-documents')).toHaveText('0');
   });
 
   test('a claim that was changed elsewhere is not overwritten', async ({ page }) => {
@@ -285,16 +282,18 @@ test.describe('claim dialog: reimbursement, payment and documents', () => {
     expect(api.claims[0]!.provider).toBe('Praxis Dr. Huber');
   });
 
-  test('Escape closes the dialog, and the cards speak English after a switch', async ({ page }) => {
+  test('Escape closes the dialog, and the table speaks English after a switch', async ({
+    page,
+  }) => {
     await page.goto('/?view=list');
     const dialog = await openClaim(page);
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
 
     await page.getByRole('button', { name: 'EN', exact: true }).click();
-    await expect(card(page).getByTestId('reimbursement-badge')).toHaveText('Open');
-    await expect(card(page).getByTestId('payment-badge')).toHaveText('Not paid');
-    await expect(card(page).getByTestId('card-submitted')).toHaveText('Not yet');
+    await expect(row(page).getByTestId('reimbursement-badge')).toHaveText('Open');
+    await expect(row(page)).toContainText('Not paid');
+    await expect(page.getByRole('columnheader', { name: 'Doctor or hospital' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Paid, but not reimbursed yet' })).toBeVisible();
   });
 });
