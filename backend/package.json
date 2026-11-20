@@ -9,12 +9,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1168.0",
-    "@aws-sdk/client-s3": "^3.1168.0",
-    "@aws-sdk/client-textract": "^3.1168.0",
-    "@aws-sdk/lib-dynamodb": "^3.1168.0",
-    "@aws-sdk/s3-presigned-post": "^3.1168.0",
-    "@aws-sdk/s3-request-presigner": "^3.1168.0",
+    "@aws-sdk/client-dynamodb": "^3.1170.0",
+    "@aws-sdk/client-s3": "^3.1170.0",
+    "@aws-sdk/client-textract": "^3.1170.0",
+    "@aws-sdk/lib-dynamodb": "^3.1170.0",
+    "@aws-sdk/s3-presigned-post": "^3.1170.0",
+    "@aws-sdk/s3-request-presigner": "^3.1170.0",
     "@myclaimgrid/shared": "*",
     "zod": "^4.6.7"
   },
