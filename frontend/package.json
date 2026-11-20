@@ -34,6 +34,6 @@
     "@angular/build": "^22.2.7",
     "@angular/cli": "^22.2.7",
     "@angular/compiler-cli": "^22.2.6",
-    "@playwright/test": "^1.65.0"
+    "@playwright/test": "^1.65.1"
   }
 }
